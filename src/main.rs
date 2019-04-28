@@ -1,4 +1,5 @@
 mod markdown_parser;
+
 use actix_web::{server, App, HttpRequest, Responder};
 
 fn greet(req: &HttpRequest) -> impl Responder {
