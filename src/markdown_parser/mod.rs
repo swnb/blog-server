@@ -33,22 +33,28 @@ pub fn replace_escape_sequence(text: &str) -> std::borrow::Cow<'_, str> {
 
 pub fn parse_markdown2html_json_struct(text: &str) -> String {
 	let parser = Parser::new(text).map(|event| match event {
-		Event::Text(text) => Event::Text(text.replace("\t", "    ").into()), // replace \t into space
+		Event::Text(text) => Event::Text(text.replace("\t", "    ").into()), // replace \t into  4 space
 		_ => event,
 	});
+	// parse makrdown into html
 	let mut text = String::from("");
 	html::push_html(&mut text, parser);
+	// parse html string into dom struct
 	let mut p = h_Parser::new(&mut text);
 	p.on_dom_insert(|dom: &mut Dom| {
 		if dom.query_tag_name() == "content" {
 			let attrs = dom.query_mut_attrs();
 			if let Some(text) = attrs.get("text") {
+				// replace escape string
 				let text = replace_escape_sequence(text);
 				attrs.insert(String::from("text"), text.to_string());
 			}
 		}
 	});
-	p.parse();
+	// println error message when error happen
+	p.parse().unwrap_or_else(|error_message| {
+		println!("{}", error_message);
+	});
 	let result = p.result();
 	serde_json::to_string(result).unwrap()
 }
