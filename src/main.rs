@@ -1,6 +1,6 @@
 mod markdown_parser;
+use actix_web::{middleware, server, App, HttpRequest, Responder};
 use std::fs;
-use actix_web::{server, App, middleware, HttpRequest, Responder};
 
 fn greet(req: &HttpRequest) -> impl Responder {
 	let text = fs::read_to_string("./example.md").unwrap();
@@ -9,7 +9,10 @@ fn greet(req: &HttpRequest) -> impl Responder {
 
 fn main() {
 	server::new(|| {
-		App::new().middleware(middleware::DefaultHeaders::new().header("Access-Control-Allow-Origin", "*"))
+		App::new()
+			.middleware(
+				middleware::DefaultHeaders::new().header("Access-Control-Allow-Origin", "*"),
+			)
 			.resource("/paper/{paper_id}", |r| {
 				r.f(greet);
 			})

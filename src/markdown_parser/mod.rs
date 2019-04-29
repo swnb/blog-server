@@ -1,9 +1,9 @@
 mod html_parser;
 
-use serde_json;
-use serde::{Deserialize, Serialize};
-use html_parser::{dom::Dom,parser::Parser as h_Parser};
+use html_parser::{dom::Dom, parser::Parser as h_Parser};
 use pulldown_cmark::{html, Event, Parser};
+use serde::{Deserialize, Serialize};
+use serde_json;
 
 // &quot; -> """
 // &amp; -> "&"
@@ -39,16 +39,16 @@ pub fn parse_markdown2html_json_struct(text: &str) -> String {
 	let mut text = String::from("");
 	html::push_html(&mut text, parser);
 	let mut p = h_Parser::new(&mut text);
-	p.on_dom_insert(|dom:&mut Dom|{
-		if dom.query_tag_name() =="content"{
+	p.on_dom_insert(|dom: &mut Dom| {
+		if dom.query_tag_name() == "content" {
 			let attrs = dom.query_mut_attrs();
 			if let Some(text) = attrs.get("text") {
-				let text =replace_escape_sequence(text);
-				attrs.insert(String::from("text"),text.to_string());
+				let text = replace_escape_sequence(text);
+				attrs.insert(String::from("text"), text.to_string());
 			}
 		}
 	});
 	p.parse();
 	let result = p.result();
- 	serde_json::to_string(result).unwrap()
+	serde_json::to_string(result).unwrap()
 }
