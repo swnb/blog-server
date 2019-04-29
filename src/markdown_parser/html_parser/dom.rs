@@ -39,6 +39,11 @@ impl Dom {
 		&self.attrs
 	}
 
+	// query all attrs as mut
+	pub fn query_mut_attrs(&mut self) -> &mut HashMap<String, String> {
+		&mut self.attrs
+	}
+
 	pub fn query_children(&self) -> &Vec<Dom> {
 		&self.children
 	}

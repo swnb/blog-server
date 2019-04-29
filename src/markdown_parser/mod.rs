@@ -2,7 +2,7 @@ mod html_parser;
 
 use serde_json;
 use serde::{Deserialize, Serialize};
-use html_parser::{dom,parser::Parser as h_Parser};
+use html_parser::{dom::Dom,parser::Parser as h_Parser};
 use pulldown_cmark::{html, Event, Parser};
 
 // &quot; -> """
@@ -25,13 +25,13 @@ pub fn replace_escape_sequence(text: &str) -> std::borrow::Cow<'_, str> {
 		"&quot;" => "\"",
 		"&amp;" => "&",
 		"&lt;" => "<",
-		"&gt" => ">",
+		"&gt;" => ">",
 		"&nbsp;" => " ",
 		_ => panic!("error in regex when replace Escape Sequence"),
 	})
 }
 
-pub fn parse_markdown2html_json_struct(text: &str) -> Result<String> {
+pub fn parse_markdown2html_json_struct(text: &str) -> String {
 	let parser = Parser::new(text).map(|event| match event {
 		Event::Text(text) => Event::Text(text.replace("\t", "    ").into()), // replace \t into space
 		_ => event,
@@ -39,7 +39,16 @@ pub fn parse_markdown2html_json_struct(text: &str) -> Result<String> {
 	let mut text = String::from("");
 	html::push_html(&mut text, parser);
 	let mut p = h_Parser::new(&mut text);
+	p.on_dom_insert(|dom:&mut Dom|{
+		if dom.query_tag_name() =="content"{
+			let attrs = dom.query_mut_attrs();
+			if let Some(text) = attrs.get("text") {
+				let text =replace_escape_sequence(text);
+				attrs.insert(String::from("text"),text.to_string());
+			}
+		}
+	});
 	p.parse();
 	let result = p.result();
-	serde_json::to_string(result)
+ 	serde_json::to_string(result).unwrap()
 }
