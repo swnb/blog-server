@@ -2,7 +2,6 @@ mod html_parser;
 
 use html_parser::{dom::Dom, parser::Parser as h_Parser};
 use pulldown_cmark::{html, Event, Parser};
-use serde::{Deserialize, Serialize};
 use serde_json;
 
 // &quot; -> """
@@ -13,12 +12,11 @@ use serde_json;
 
 use lazy_static::lazy_static;
 
-use regex::{Captures, Regex};
-
 lazy_static! {
 	static ref REGEX: Regex = Regex::new("&(quot|amp|lt|gt|nbsp);").unwrap();
 }
 
+use regex::{Captures, Regex};
 // replace Escape Sequence into text
 pub fn replace_escape_sequence(text: &str) -> std::borrow::Cow<'_, str> {
 	REGEX.replace_all(text, |cap: &Captures| match &cap[0] {
@@ -40,8 +38,8 @@ pub fn parse_markdown2html_json_struct(text: &str) -> String {
 	let mut text = String::from("");
 	html::push_html(&mut text, parser);
 	// parse html string into dom struct
-	let mut p = h_Parser::new(&mut text);
-	p.on_dom_insert(|dom: &mut Dom| {
+	let mut parser = h_Parser::new(&mut text);
+	parser.on_dom_insert(|dom: &mut Dom| {
 		if dom.query_tag_name() == "content" {
 			let attrs = dom.query_mut_attrs();
 			if let Some(text) = attrs.get("text") {
@@ -52,9 +50,9 @@ pub fn parse_markdown2html_json_struct(text: &str) -> String {
 		}
 	});
 	// println error message when error happen
-	p.parse().unwrap_or_else(|error_message| {
+	parser.parse().unwrap_or_else(|error_message| {
 		println!("{}", error_message);
 	});
-	let result = p.result();
+	let result = parser.result();
 	serde_json::to_string(result).unwrap()
 }
