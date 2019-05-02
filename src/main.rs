@@ -1,21 +1,12 @@
 mod markdown_parser;
-use actix_web::{middleware, server, App, HttpRequest, Responder};
-use std::fs;
-
-fn greet(req: &HttpRequest) -> impl Responder {
-	let text = fs::read_to_string("./example.md").unwrap();
-	markdown_parser::parse_markdown2html_json_struct(&text)
-}
+mod paper;
+use actix_web::{server, App};
 
 fn main() {
 	server::new(|| {
-		App::new()
-			.middleware(
-				middleware::DefaultHeaders::new().header("Access-Control-Allow-Origin", "*"),
-			)
-			.resource("/paper/{paper_id}", |r| {
-				r.f(greet);
-			})
+		let app = App::new();
+		let app = paper::reader_paper(app);
+		app
 	})
 	.bind("127.0.0.1:9999")
 	.expect("bind port 9999")
