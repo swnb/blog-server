@@ -6,6 +6,6 @@ create table  if not exists `papers` (
 	`last_change_time` timestamp default now(),
 	`create_time` timestamp default now(),
 	`tags` varchar(255) not null,
-	`index_hash` varchar(64) not null unique,
-	key `index_some`(`index_hash`)
+	`hash` varchar(64) not null unique,
+	key `index_hash`(`hash`)
 );

@@ -7,6 +7,6 @@ table! {
 		last_change_time -> Varchar,
 		create_time	 -> Varchar,
 		tags -> Varchar,
-		index_hash -> Varchar,
+		hash -> Varchar,
 	}
 }

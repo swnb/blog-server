@@ -1,27 +1,44 @@
 use super::markdown_parser;
 use super::models;
-use actix_web::{http, middleware::DefaultHeaders, App, HttpRequest, Path, Responder};
+use actix_web::{http::Method, App, HttpRequest, Path, Responder};
 use diesel::prelude::*;
 use serde_json;
 use std::fs;
 use uuid::Uuid;
 
-fn read_paper(paper_id: Path<String>) -> impl Responder {
-	use models::{schema::papers::dsl::*, table::Papers};
-
+// reader paper info list,each paper list 5 row most
+const PAGE_AMOUNT: i64 = 5;
+fn read_paper_info(path: Path<(i64)>) -> impl Responder {
+	use models::{schema::papers::dsl::*, table::PaperInfo};
 	let connection = models::connect();
-	let paper_id = match paper_id.parse::<i32>() {
-		Ok(paper_id) => paper_id,
-		Err(_) => return String::from("can't parser paper_id"),
-	};
+	let offset = *path - 1;
+	let result = papers
+		.select((title, author, last_change_time, create_time, tags, hash))
+		.limit(PAGE_AMOUNT)
+		.offset(PAGE_AMOUNT * offset)
+		.load::<PaperInfo>(&connection)
+		.unwrap();
 
+	match serde_json::to_string(&result) {
+		Ok(result) => result,
+		Err(_) => String::from("server error"),
+	}
+}
+
+// reader paper content by paper id
+fn read_paper_content(path: Path<String>) -> impl Responder {
+	use models::{schema::papers::dsl::*, table::Paper};
+	let connection = models::connect();
+
+	// copy string
+	let ref paper_hash: String = *path;
 	let mut result = papers
-		.filter(id.eq(paper_id))
+		.filter(hash.eq(paper_hash))
 		.limit(5)
-		.load::<Papers>(&connection)
+		.load::<Paper>(&connection)
 		.expect("some thing is happen");
 
-	result.iter_mut().for_each(|paper: &mut Papers| {
+	result.iter_mut().for_each(|paper: &mut Paper| {
 		let text = &paper.content;
 		paper.content = markdown_parser::parse_markdown2html_json_struct(text);
 	});
@@ -32,6 +49,7 @@ fn read_paper(paper_id: Path<String>) -> impl Responder {
 	}
 }
 
+// post new paper
 fn post_paper(_: &HttpRequest) -> impl Responder {
 	use models::schema::papers::dsl::*;
 	let connection = models::connect();
@@ -44,7 +62,7 @@ fn post_paper(_: &HttpRequest) -> impl Responder {
 			content.eq(text),
 			author.eq("swnb"),
 			tags.eq("[swnb,rust,monad]"),
-			index_hash.eq(gloabal_id),
+			hash.eq(gloabal_id),
 		))
 		.execute(&connection);
 
@@ -55,13 +73,14 @@ fn post_paper(_: &HttpRequest) -> impl Responder {
 }
 
 pub fn handler(app: App<()>) -> App<()> {
-	// cors_header
-	let cros_header: DefaultHeaders =
-		DefaultHeaders::new().header("Access-Control-Allow-Origin", "*");
-
-	app.middleware(cros_header)
-		.resource("/get/paper/{paper_id}", |r| {
-			r.method(http::Method::GET).with(read_paper)
-		})
-		.resource("/post/paper/", |r| r.f(post_paper))
+	app.scope("/blog", |scope| {
+		scope
+			.resource("/get/paper/content/{paper_hash}", |r| {
+				r.method(Method::GET).with(read_paper_content)
+			})
+			.resource("/get/paper/infos/{page}", |r| {
+				r.method(Method::GET).with(read_paper_info)
+			})
+			.resource("/post/paper/", |r| r.f(post_paper))
+	})
 }
