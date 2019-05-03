@@ -1,1 +1,1 @@
-drop table `paper`;
+drop table `papers`;
