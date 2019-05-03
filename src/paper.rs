@@ -1,9 +1,9 @@
 use super::markdown_parser;
 use super::models;
-use actix_web::{http::Method, App, HttpRequest, Path, Responder};
+use actix_web::{http::Method, App, Json, Path, Responder};
 use diesel::prelude::*;
+use serde::Deserialize;
 use serde_json;
-use std::fs;
 use uuid::Uuid;
 
 // reader paper info list,each paper list 5 row most
@@ -49,20 +49,38 @@ fn read_paper_content(path: Path<String>) -> impl Responder {
 	}
 }
 
+#[derive(Deserialize)]
+struct PaperJsonParam {
+	title: String,
+	content: String,
+	author: Option<String>,
+	tags: Vec<String>,
+}
+
 // post new paper
-fn post_paper(_: &HttpRequest) -> impl Responder {
+fn post_paper(paper: Json<PaperJsonParam>) -> impl Responder {
 	use models::schema::papers::dsl::*;
 	let connection = models::connect();
-	let text = fs::read_to_string("./example.md").unwrap();
-	let gloabal_id: String = Uuid::new_v4().to_string();
+	let PaperJsonParam {
+		title: param_title,
+		content: param_content,
+		author: param_author,
+		tags: param_tags,
+	} = &*paper;
+	let param_author: String = if let Some(param_author) = param_author {
+		param_author.to_owned()
+	} else {
+		String::from("swnb")
+	};
+	let hash_id: String = Uuid::new_v4().to_string();
 
 	let result = diesel::insert_into(papers)
 		.values((
-			title.eq("monad"),
-			content.eq(text),
-			author.eq("swnb"),
-			tags.eq("[swnb,rust,monad]"),
-			hash.eq(gloabal_id),
+			title.eq(param_title),
+			content.eq(param_content),
+			author.eq(param_author),
+			tags.eq(param_tags.join(",")),
+			hash.eq(hash_id),
 		))
 		.execute(&connection);
 
@@ -81,6 +99,6 @@ pub fn handler(app: App<()>) -> App<()> {
 			.resource("/get/paper/infos/{page}", |r| {
 				r.method(Method::GET).with(read_paper_info)
 			})
-			.resource("/post/paper/", |r| r.f(post_paper))
+			.resource("/post/paper/", |r| r.method(Method::POST).with(post_paper))
 	})
 }
