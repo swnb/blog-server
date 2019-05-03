@@ -54,7 +54,7 @@ fn post_paper(_: &HttpRequest) -> impl Responder {
 	}
 }
 
-pub fn reader_paper(app: App<()>) -> App<()> {
+pub fn handler(app: App<()>) -> App<()> {
 	// cors_header
 	let cros_header: DefaultHeaders =
 		DefaultHeaders::new().header("Access-Control-Allow-Origin", "*");

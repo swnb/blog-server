@@ -8,10 +8,9 @@ mod paper;
 use actix_web::{server, App};
 
 fn main() {
-	models::connect();
 	server::new(|| {
 		let app = App::new();
-		let app = paper::reader_paper(app);
+		let app = paper::handler(app);
 		app
 	})
 	.bind("127.0.0.1:9999")
