@@ -6,7 +6,7 @@ use serde::Deserialize;
 use serde_json;
 use uuid::Uuid;
 
-// reader paper info list,each paper list 5 row most
+// reader paper info list,each paper limit 5 row most
 const PAGE_AMOUNT: i64 = 5;
 fn read_paper_info(path: Path<(i64)>) -> impl Responder {
 	use models::{schema::papers::dsl::*, table::PaperInfo};
@@ -58,7 +58,7 @@ struct PaperJsonParam {
 }
 
 // post new paper
-fn post_paper(paper: Json<PaperJsonParam>) -> impl Responder {
+fn post_new_paper(paper: Json<PaperJsonParam>) -> impl Responder {
 	use models::schema::papers::dsl::*;
 	let connection = models::connect();
 	let PaperJsonParam {
@@ -99,6 +99,8 @@ pub fn handler(app: App<()>) -> App<()> {
 			.resource("/get/paper/infos/{page}", |r| {
 				r.method(Method::GET).with(read_paper_info)
 			})
-			.resource("/post/paper/", |r| r.method(Method::POST).with(post_paper))
+			.resource("/post/paper/", |r| {
+				r.method(Method::POST).with(post_new_paper)
+			})
 	})
 }
