@@ -1,7 +1,5 @@
-use super::markdown_parser;
 use super::models;
 use actix_web::{http::Method, App, Json, Path, Responder};
-use diesel::prelude::*;
 use serde::Deserialize;
 use serde_json;
 use uuid::Uuid;
@@ -20,23 +18,11 @@ fn read_paper_info(path: Path<(i64)>) -> impl Responder {
 
 // reader paper content by paper id
 fn read_paper_content(path: Path<String>) -> impl Responder {
-	use models::{schema::papers::dsl::*, table::Paper};
-	let connection = models::connect();
-
 	// copy string
 	let paper_hash: &str = &*path;
-	let mut result = papers
-		.filter(hash.eq(paper_hash))
-		.limit(1)
-		.load::<Paper>(&connection)
-		.expect("some thing is happen");
+	let result = models::query_paper_content(paper_hash);
 
-	result.iter_mut().for_each(|paper: &mut Paper| {
-		let text = &paper.content;
-		paper.content = markdown_parser::parse_markdown2html_json_struct(text);
-	});
-
-	match serde_json::to_string(&result) {
+	match result {
 		Ok(result) => result,
 		Err(_) => String::from("server error"),
 	}
@@ -52,17 +38,15 @@ struct PaperJsonParam {
 
 // post new paper
 fn post_new_paper(paper: Json<PaperJsonParam>) -> impl Responder {
-	let connection = models::connect();
 	let PaperJsonParam {
 		title: param_title,
 		content: param_content,
 		author: param_author,
 		tags: param_tags,
 	} = &*paper;
-	let param_author: &str = if let Some(param_author) = param_author {
-		param_author
-	} else {
-		"swnb"
+	let param_author: &str = match param_author {
+		Some(author) => author,
+		None => "swnb",
 	};
 	let hash_id: String = Uuid::new_v4().to_string();
 
