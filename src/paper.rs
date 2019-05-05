@@ -9,15 +9,8 @@ use uuid::Uuid;
 // reader paper info list,each paper limit 5 row most
 const PAGE_AMOUNT: i64 = 5;
 fn read_paper_info(path: Path<(i64)>) -> impl Responder {
-	use models::{schema::papers::dsl::*, table::PaperInfo};
-	let connection = models::connect();
 	let offset = *path - 1;
-	let result = papers
-		.select((title, author, last_change_time, create_time, tags, hash))
-		.limit(PAGE_AMOUNT)
-		.offset(PAGE_AMOUNT * offset)
-		.load::<PaperInfo>(&connection)
-		.unwrap();
+	let result = models::query_paper_infos(PAGE_AMOUNT, offset).unwrap();
 
 	match serde_json::to_string(&result) {
 		Ok(result) => result,
@@ -31,10 +24,10 @@ fn read_paper_content(path: Path<String>) -> impl Responder {
 	let connection = models::connect();
 
 	// copy string
-	let ref paper_hash: String = *path;
+	let paper_hash: &str = &*path;
 	let mut result = papers
 		.filter(hash.eq(paper_hash))
-		.limit(5)
+		.limit(1)
 		.load::<Paper>(&connection)
 		.expect("some thing is happen");
 
@@ -59,7 +52,6 @@ struct PaperJsonParam {
 
 // post new paper
 fn post_new_paper(paper: Json<PaperJsonParam>) -> impl Responder {
-	use models::schema::papers::dsl::*;
 	let connection = models::connect();
 	let PaperJsonParam {
 		title: param_title,
@@ -67,26 +59,24 @@ fn post_new_paper(paper: Json<PaperJsonParam>) -> impl Responder {
 		author: param_author,
 		tags: param_tags,
 	} = &*paper;
-	let param_author: String = if let Some(param_author) = param_author {
-		param_author.to_owned()
+	let param_author: &str = if let Some(param_author) = param_author {
+		param_author
 	} else {
-		String::from("swnb")
+		"swnb"
 	};
 	let hash_id: String = Uuid::new_v4().to_string();
 
-	let result = diesel::insert_into(papers)
-		.values((
-			title.eq(param_title),
-			content.eq(param_content),
-			author.eq(param_author),
-			tags.eq(param_tags.join(",")),
-			hash.eq(hash_id),
-		))
-		.execute(&connection);
+	let result = models::post_paper(
+		param_title,
+		param_content,
+		param_author,
+		param_tags,
+		&hash_id,
+	);
 
 	match result {
 		Ok(_) => String::from("Ok"),
-		Err(err) => format!("{:?}", err),
+		Err(_) => String::from("post new paper fail see log file"),
 	}
 }
 

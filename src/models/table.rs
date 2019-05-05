@@ -24,3 +24,10 @@ pub struct PaperInfo {
 	tags: String,
 	hash: String,
 }
+
+#[derive(Queryable, Deserialize, Serialize, Insertable)]
+#[table_name = "papers"]
+pub struct PaperContent {
+	title: String,
+	pub content: String,
+}
