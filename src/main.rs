@@ -9,7 +9,9 @@ mod utils;
 use actix_web::{server, App};
 
 fn main() {
+	// set variable
 	utils::env::set_env();
+
 	server::new(|| {
 		let app = App::new();
 		paper::handler(app)

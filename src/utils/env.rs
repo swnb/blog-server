@@ -8,7 +8,10 @@ pub fn set_env() {
 
 	let env_file_path = current_dir.join(".env");
 
-	let file = fs::File::open(env_file_path).expect("can't open .env file in current dir");
+	let file = match fs::File::open(env_file_path) {
+		Ok(file) => file,
+		Err(_) => return,
+	};
 
 	let file_reader = BufReader::new(file);
 
