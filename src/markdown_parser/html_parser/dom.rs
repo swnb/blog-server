@@ -1,6 +1,7 @@
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Dom {
 	tag: String,
 	attrs: HashMap<String, String>,
@@ -36,6 +37,11 @@ impl Dom {
 	// query all attrs
 	pub fn query_attrs(&self) -> &HashMap<String, String> {
 		&self.attrs
+	}
+
+	// query all attrs as mut
+	pub fn query_mut_attrs(&mut self) -> &mut HashMap<String, String> {
+		&mut self.attrs
 	}
 
 	pub fn query_children(&self) -> &Vec<Dom> {

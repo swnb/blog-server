@@ -11,7 +11,7 @@ pub struct Parser<'a> {
 	offset: usize,
 	stack: Vec<Dom>,
 	chars: Peekable<Chars<'a>>,
-	cbList: Vec<Callback>,
+	cb_list: Vec<Callback>,
 }
 
 impl<'a> Parser<'a> {
@@ -50,7 +50,7 @@ impl<'a> Parser<'a> {
 			stack: vec![],
 			offset: 0,
 			chars,
-			cbList: vec![],
+			cb_list: vec![],
 		}
 	}
 
@@ -203,7 +203,7 @@ impl<'a> Parser<'a> {
 	}
 
 	fn insert_node(&mut self, mut node: Dom) {
-		for cb in &self.cbList {
+		for cb in &self.cb_list {
 			cb(&mut node)
 		}
 		match self.stack.last_mut() {
@@ -219,7 +219,7 @@ impl<'a> Parser<'a> {
 	where
 		F: 'static + Send + Fn(&mut Dom),
 	{
-		self.cbList.push(Box::new(callback));
+		self.cb_list.push(Box::new(callback));
 	}
 }
 
