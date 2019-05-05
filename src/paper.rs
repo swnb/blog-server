@@ -32,7 +32,7 @@ fn read_paper_content(path: Path<String>) -> impl Responder {
 struct PaperJsonParam {
 	title: String,
 	content: String,
-	author: Option<String>,
+	author: String,
 	tags: Vec<String>,
 }
 
@@ -44,10 +44,7 @@ fn post_new_paper(paper: Json<PaperJsonParam>) -> impl Responder {
 		author: param_author,
 		tags: param_tags,
 	} = &*paper;
-	let param_author: &str = match param_author {
-		Some(author) => author,
-		None => "swnb",
-	};
+
 	let hash_id: String = Uuid::new_v4().to_string();
 
 	let result = models::post_paper(
