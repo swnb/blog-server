@@ -4,7 +4,6 @@ pub mod table;
 use super::markdown_parser;
 use diesel::prelude::*;
 use schema::papers::dsl::*;
-
 use std::env;
 
 pub fn connect() -> MysqlConnection {
