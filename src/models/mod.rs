@@ -18,8 +18,17 @@ pub fn connect() -> MysqlConnection {
 
 // define error enum
 pub enum Error {
-	Qyery(String),
+	Query(String),
 	Database(String),
+}
+
+impl std::fmt::Debug for Error {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::result::Result<(), std::fmt::Error> {
+		match self {
+			Error::Query(message) => write!(f, "err query : {}", message),
+			Error::Database(message) => write!(f, "err database : {}", message),
+		}
+	}
 }
 
 // query paper infos from database
@@ -53,7 +62,7 @@ pub fn query_paper_content(paper_hash: &str) -> Result<String, Error> {
 				&row.content,
 			))
 		} else {
-			Err(Error::Qyery(String::from("query result nothing")))
+			Err(Error::Query(String::from("query result nothing")))
 		}
 	} else {
 		Err(Error::Database(String::from("database error")))
