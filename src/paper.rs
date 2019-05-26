@@ -16,7 +16,7 @@ fn read_paper_info(path: Path<(i64)>) -> impl Responder {
 	}
 }
 
-// reader paper content by paper id
+// reader paper content by paper hash id
 fn read_paper_content(path: Path<String>) -> impl Responder {
 	// copy string
 	let paper_hash: &str = &*path;
@@ -33,6 +33,7 @@ struct PaperJsonParam {
 	title: String,
 	content: String,
 	author: String,
+	create_time: String,
 	tags: Vec<String>,
 }
 
@@ -42,6 +43,7 @@ fn post_new_paper(paper: Json<PaperJsonParam>) -> impl Responder {
 		title: param_title,
 		content: param_content,
 		author: param_author,
+		create_time: param_create_time,
 		tags: param_tags,
 	} = &*paper;
 
@@ -51,13 +53,14 @@ fn post_new_paper(paper: Json<PaperJsonParam>) -> impl Responder {
 		param_title,
 		param_content,
 		param_author,
+		param_create_time,
 		param_tags,
 		&hash_id,
 	);
 
 	match result {
 		Ok(_) => String::from("Ok"),
-		Err(_) => String::from("post new paper fail see log file"),
+		Err(_) => String::from("post new paper fail ; see log file"),
 	}
 }
 
