@@ -1,0 +1,8 @@
+version: '3'
+services:
+  server:
+    environment: 
+    - MYSQL_URL=mysql://${user}:${passwd}@:127.0.0.1:${port}/database_name
+    build: ./docker/
+    ports:
+    - "9999:9999"
