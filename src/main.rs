@@ -17,7 +17,7 @@ fn main() {
 		let app = App::new();
 		paper::handler(app)
 	})
-	.bind("127.0.0.1:9999")
-	.expect("bind port 9999")
+	.bind("127.0.0.1:80")
+	.expect("bind port 80")
 	.run();
 }
