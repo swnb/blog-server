@@ -1,5 +1,5 @@
 use super::models;
-use actix_web::{http::Method, App, Json, Path, Responder};
+use actix_web::{http::Method, App, HttpRequest, Json, Path, Responder};
 use serde::Deserialize;
 use serde_json;
 use uuid::Uuid;
@@ -64,9 +64,14 @@ fn post_new_paper(paper: Json<PaperJsonParam>) -> impl Responder {
 	}
 }
 
+fn alive_check(req: &HttpRequest) -> impl Responder {
+	"server success init"
+}
+
 pub fn handler(app: App<()>) -> App<()> {
 	app.scope("/blog", |scope| {
 		scope
+			.resource("/check", |r| r.h(alive_check))
 			.resource("/get/paper/content/{paper_hash}", |r| {
 				r.method(Method::GET).with(read_paper_content)
 			})
