@@ -4,7 +4,6 @@ pub mod table;
 use super::markdown_parser;
 use diesel::prelude::*;
 use schema::papers::dsl::*;
-
 use std::env;
 
 pub fn connect() -> MysqlConnection {
@@ -74,6 +73,7 @@ pub fn post_paper(
 	param_title: &str,
 	param_content: &str,
 	param_author: &str,
+	param_create_time: &str,
 	param_tags: &Vec<String>,
 	hash_id: &str,
 ) -> Result<usize, Error> {
@@ -83,9 +83,12 @@ pub fn post_paper(
 			title.eq(param_title),
 			content.eq(param_content),
 			author.eq(param_author),
+			create_time.eq(param_create_time),
 			tags.eq(param_tags.join(",")),
 			hash.eq(hash_id),
 		))
-		.execute(&connection)
-		.map_err(|_| Error::Database(String::from("can't get query result from database")))
+		.execute(&connection).unwrap();
+		
+		Ok(1)
+		// .map_err(|_| Error::Database(String::from("can't get post result from database")))
 }

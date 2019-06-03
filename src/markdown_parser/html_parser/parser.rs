@@ -90,15 +90,14 @@ impl<'a> Parser<'a> {
 					self.clear_whitespace();
 					let tag_name = self.read_tag_name();
 					self.clear_whitespace();
+					let attr = self.read_attrs();
 					if self.is_next_then_jump(|&c| c == '/') {
 						// <tag_name>
 						self.is_next_then_jump(|&c| c == '>');
 						// close tag
-						let dom = Dom::new(&tag_name, HashMap::new(), vec![]);
+						let dom = Dom::new(&tag_name, attr, vec![]);
 						self.insert_node(dom);
 					} else {
-						// parse attr
-						let attr = self.read_attrs();
 						// >
 						self.clear_whitespace();
 						if !self.is_next_then_jump(|&c| c == '>') {
@@ -155,7 +154,7 @@ impl<'a> Parser<'a> {
 		let mut attrs = HashMap::new();
 		loop {
 			self.clear_whitespace();
-			if self.is_next(|&c| c == '>') {
+			if self.is_next(|&c| c == '>') || self.is_next(|&c| c == '/') {
 				break;
 			} else {
 				let key = self.read_tag_name();
