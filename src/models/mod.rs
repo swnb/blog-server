@@ -5,13 +5,28 @@ use super::markdown_parser;
 use diesel::prelude::*;
 use schema::papers::dsl::*;
 use std::env;
+use std::{thread, time};
 
 pub fn connect() -> MysqlConnection {
-	match env::var("MYSQL_URL") {
-		Ok(connection_url) => MysqlConnection::establish(&connection_url).unwrap_or_else(|_| {
-			panic!("can't connect with database");
-		}),
-		Err(_) => panic!("can't get mysql connect url from env"),
+	let mut connect_counter = 0;
+	loop {
+		let conncet_url = match env::var("MYSQL_URL") {
+			Ok(connect_url) => connect_url,
+			Err(_) => panic!("can't get mysql connect url"),
+		};
+
+		match MysqlConnection::establish(&conncet_url) {
+			Ok(connection) => break connection,
+			Err(_) => {
+				// connect database with connection url in 30 min;
+				if connect_counter > 30 {
+					panic!("can't connect mysql database");
+				}
+				connect_counter += 1;
+				thread::sleep(time::Duration::from_secs(1));
+				continue;
+			}
+		}
 	}
 }
 
@@ -87,8 +102,9 @@ pub fn post_paper(
 			tags.eq(param_tags.join(",")),
 			hash.eq(hash_id),
 		))
-		.execute(&connection).unwrap();
-		
-		Ok(1)
-		// .map_err(|_| Error::Database(String::from("can't get post result from database")))
+		.execute(&connection)
+		.unwrap();
+
+	Ok(1)
+	// .map_err(|_| Error::Database(String::from("can't get post result from database")))
 }

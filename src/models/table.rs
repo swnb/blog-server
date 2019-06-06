@@ -1,6 +1,7 @@
-use super::schema::papers;
+use super::schema::{paper_tags, papers};
 use serde::{Deserialize, Serialize};
 
+// tables papers
 #[derive(Queryable, Deserialize, Serialize, Insertable)]
 #[table_name = "papers"]
 pub struct Paper {
@@ -14,6 +15,7 @@ pub struct Paper {
 	hash: String,
 }
 
+// select paper base info without content from table
 #[derive(Queryable, Deserialize, Serialize, Insertable)]
 #[table_name = "papers"]
 pub struct PaperInfo {
@@ -25,9 +27,18 @@ pub struct PaperInfo {
 	hash: String,
 }
 
+// select paper content from papers
 #[derive(Queryable, Deserialize, Serialize, Insertable)]
 #[table_name = "papers"]
 pub struct PaperContent {
 	title: String,
 	pub content: String,
+}
+
+// table tag with paper id
+#[derive(Queryable, Deserialize, Serialize, Insertable)]
+#[table_name = "paper_tags"]
+struct PaperTags {
+	id: i32,
+	tag: String,
 }

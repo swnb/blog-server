@@ -1,0 +1,20 @@
+version: '3'
+services: 
+  server:
+    image: ${BLOG_IMAGE_ADDRESS}
+    environment: 
+      MYSQL_URL: mysql://root:${MYSQL_PASSWORD}@database/blog
+    ports:
+      - 9999:80
+  database:
+    image: mysql:5.7
+    restart: always
+    volumes:
+      - ./database/mysql-data:/var/lib/mysql
+      - ./database/mysql-init-files:/docker-entrypoint-initdb.d
+    environment: 
+      MYSQL_DATABASE: blog
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD}
+    ports: 
+    - 9603:3306
+    command: ['mysqld', '--character-set-server=utf8mb4', '--collation-server=utf8mb4_unicode_ci']
