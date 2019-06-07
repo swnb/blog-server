@@ -7,15 +7,14 @@ table! {
 		author -> Varchar,
 		last_change_time -> Varchar,
 		create_time	 -> Varchar,
-		tags -> Varchar,
 		hash -> Varchar,
 	}
 }
 
 // tag with paper_id
-table!{
+table! {
 	paper_tags (id){
-		id -> Integer,
+		id -> Varchar,
 		tag -> Varchar,
 	}
 }

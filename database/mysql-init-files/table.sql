@@ -5,13 +5,12 @@ create table if not exists `papers` (
 	`author` varchar(255) not null,
 	`last_change_time` timestamp default now(),
 	`create_time` varchar(255) not null,
-	`tags` varchar(255) not null,
 	`hash` varchar(64) not null unique,
-	key `index_hash`(`hash`)
+	key `index_hash_content`(`hash`,`content`)
 );
 
 create table if not exists `paper_tags` (
-	`id` int(11) not null,
+	`id` varchar(64) not null,
 	`tag` varchar(255) not null,
 	primary key(`id`,`tag`),
 	union key `index_tag_id` (`tag`,`id`)

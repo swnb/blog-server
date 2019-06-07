@@ -11,7 +11,6 @@ pub struct Paper {
 	author: String,
 	last_change_time: String,
 	create_time: String,
-	tags: String,
 	hash: String,
 }
 
@@ -23,7 +22,6 @@ pub struct PaperInfo {
 	author: String,
 	last_change_time: String,
 	create_time: String,
-	tags: String,
 	hash: String,
 }
 
@@ -38,7 +36,7 @@ pub struct PaperContent {
 // table tag with paper id
 #[derive(Queryable, Deserialize, Serialize, Insertable)]
 #[table_name = "paper_tags"]
-struct PaperTags {
-	id: i32,
+pub struct PaperTags {
+	id: String,
 	tag: String,
 }
