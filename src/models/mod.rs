@@ -6,7 +6,7 @@ use super::markdown_parser;
 use connect::get_connection;
 use diesel::prelude::*;
 use schema::{paper_tags::dsl as paper_tags_dsl, papers::dsl as papers_dsl};
-use table::{PaperContent, PaperInfo, PaperTags};
+use table::{PaperContent, PaperInfo};
 
 // define error enum
 pub enum Error {
@@ -85,13 +85,25 @@ pub fn post_paper(
 }
 
 // query paper tags
-pub fn get_paper_tags(param_id: &str) {
+pub fn get_paper_tags(param_id: &str) -> Result<Vec<String>, Error> {
 	let connection = &*get_connection().get().expect("can't set connection");
 	use paper_tags_dsl::{id, paper_tags, tag};
 
-	let paper_tag_list = paper_tags
-		.select((id, tag))
+	paper_tags
+		.select(tag)
 		.filter(id.eq(param_id))
-		.load::<PaperTags>(connection)
-		.unwrap();
+		.load::<String>(connection)
+		.map_err(|_| Error::Query(String::from("query error")))
+}
+
+// get relatad paper by tag
+pub fn get_relatad_paper_by_tag(param_tag: &str) -> Result<Vec<String>, Error> {
+	let connection = &*get_connection().get().expect("can't set connection");
+	use paper_tags_dsl::{id, paper_tags, tag};
+
+	paper_tags
+		.select(id)
+		.filter(tag.eq(param_tag))
+		.load::<String>(connection)
+		.map_err(|_| Error::Query(String::from("query error")))
 }

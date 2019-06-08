@@ -38,5 +38,5 @@ pub struct PaperContent {
 #[table_name = "paper_tags"]
 pub struct PaperTags {
 	id: String,
-	tag: String,
+	pub tag: String,
 }
