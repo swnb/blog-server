@@ -1,5 +1,5 @@
 use super::models;
-use actix_web::{http::Method, App, HttpRequest, Json, Path, Responder};
+use actix_web::{http::Method, App, HttpRequest,Json, Path, Responder};
 use serde::Deserialize;
 use serde_json;
 use uuid::Uuid;

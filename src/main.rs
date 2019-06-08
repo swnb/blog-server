@@ -1,6 +1,5 @@
 #[macro_use]
 extern crate diesel;
-
 mod markdown_parser;
 mod models;
 mod paper;
@@ -13,12 +12,9 @@ fn main() {
 	// set variable
 	utils::env::set_env();
 
-	let port = match env::var("SERVER_PORT") {
-		Ok(port) => port,
-		Err(_) => panic!("not SERVER_PORT env var set"),
-	};
+	let port = env::var("SERVER_PORT").expect("no SERVER_PORT env var set");
 
-	let addr = String::from("0.0.0.0:") + &port;
+	let addr = "0.0.0.0:".to_owned() + &port;
 	println!("server is running at {}", addr);
 
 	server::new(|| {
