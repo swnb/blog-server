@@ -1,6 +1,7 @@
 use diesel::MysqlConnection;
 use std::env;
 use std::{thread, time};
+use lazy_static;
 
 use r2d2;
 use r2d2_diesel::ConnectionManager;

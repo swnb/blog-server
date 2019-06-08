@@ -1,5 +1,8 @@
 #[macro_use]
 extern crate diesel;
+#[macro_use]
+extern crate lazy_static;
+
 mod markdown_parser;
 mod models;
 mod paper;
