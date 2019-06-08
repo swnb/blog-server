@@ -1,5 +1,5 @@
 use super::models;
-use actix_web::{http::Method, App, HttpRequest,Json, Path, Responder};
+use actix_web::{http::Method, App, HttpRequest, Json, Path, Responder};
 use serde::Deserialize;
 use serde_json;
 use uuid::Uuid;
@@ -10,22 +10,14 @@ fn read_paper_info(path: Path<(i64)>) -> impl Responder {
 	let offset = *path - 1;
 	let result = models::query_paper_infos(PAGE_AMOUNT, offset).unwrap();
 
-	match serde_json::to_string(&result) {
-		Ok(result) => result,
-		Err(_) => String::from("server error"),
-	}
+	serde_json::to_string(&result).unwrap_or_else(|_| String::from("server error"))
 }
 
 // reader paper content by paper hash id
 fn read_paper_content(path: Path<String>) -> impl Responder {
 	// copy string
 	let paper_hash: &str = &*path;
-	let result = models::query_paper_content(paper_hash);
-
-	match result {
-		Ok(result) => result,
-		Err(_) => String::from("server error"),
-	}
+	models::query_paper_content(paper_hash).unwrap_or_else(|_| String::from("server error"))
 }
 
 #[derive(Deserialize)]
@@ -58,10 +50,9 @@ fn post_new_paper(paper: Json<PaperJsonParam>) -> impl Responder {
 		&hash_id,
 	);
 
-	match result {
-		Ok(_) => String::from("Ok"),
-		Err(_) => String::from("post new paper fail ; see log file"),
-	}
+	result
+		.map(|_| String::from("Ok"))
+		.unwrap_or_else(|_| String::from("post new paper fail ; see log file"))
 }
 
 fn alive_check(req: &HttpRequest) -> impl Responder {
