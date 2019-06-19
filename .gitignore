@@ -2,3 +2,4 @@
 **/*.rs.bk
 .env
 database/mysql-data/
+set-up.sh
