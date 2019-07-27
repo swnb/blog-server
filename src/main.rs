@@ -5,29 +5,23 @@ extern crate lazy_static;
 
 mod markdown_parser;
 mod models;
-mod paper;
+mod server;
+mod services;
 mod utils;
-
-use actix_web::{middleware::Logger, server, App};
 
 use env_logger;
 use std::env;
-fn main() {
-	// set variable
+
+type StdError = Box<dyn std::error::Error>;
+
+fn main() -> Result<(), StdError> {
+	// set develop variable
 	utils::env::set_env();
 	env_logger::init();
 
-	let port = env::var("SERVER_PORT").expect("no SERVER_PORT env var set");
-	let addr = "0.0.0.0:".to_owned() + &port;
+	let port = env::var("SERVER_PORT")?;
+	let addr = format!("0.0.0.0:{}", port);
 	println!("server is running at {}", addr);
 
-	server::new(|| {
-		let app = App::new()
-			.middleware(Logger::default())
-			.middleware(Logger::new("%a %{User-Agent}i"));
-		paper::handler(app)
-	})
-	.bind(addr)
-	.expect("bind port fail")
-	.run();
+	server::setup_server(addr.parse()?)
 }
