@@ -30,13 +30,13 @@ struct PaperJsonParam {
 // post new paper
 fn post_new_paper(paper: web::Json<PaperJsonParam>) -> impl Responder {
 	let PaperJsonParam {
-		title: param_title,
-		content: param_content,
-		author: param_author,
-		tags: param_tags,
+		title,
+		content,
+		author,
+		tags,
 	} = &*paper;
-	println!("posting paper {}", param_title);
-	let result = models::post_new_paper(param_title, param_author, param_content, param_tags);
+	println!("posting paper {}", title);
+	let result = models::post_new_paper(title, author, content, tags);
 
 	result
 		.map(|_| String::from("Ok"))
