@@ -35,16 +35,28 @@ fn post_new_paper(paper: web::Json<PaperJsonParam>) -> impl Responder {
 		author: param_author,
 		tags: param_tags,
 	} = &*paper;
-
-	let result = models::post_new_paper(param_title, param_content, param_author, param_tags);
+	println!("posting paper {}", param_title);
+	let result = models::post_new_paper(param_title, param_author, param_content, param_tags);
 
 	result
 		.map(|_| String::from("Ok"))
 		.unwrap_or_else(|_| String::from("post new paper fail ; see log file"))
 }
 
+// update paper use paper title
+fn update_paper(body: web::Json<PaperJsonParam>) {
+	let PaperJsonParam {
+		title,
+		author,
+		content,
+		tags,
+	} = &*body;
+	models::update_paper(title, author, content, tags);
+	// TODO: add error handle
+}
+
 fn alive_check(path: web::Path<String>) -> HttpResponse {
-	let phrase: String = path[..100].to_owned();
+	let phrase: String = path.clone();
 	let mut response = HttpResponse::Ok();
 	response.body(phrase)
 }
@@ -53,10 +65,11 @@ pub fn routes<'a>() -> Vec<(&'a str, Route)> {
 	vec![
 		("/check/{phrase}", web::get().to(alive_check)),
 		(
-			"/get/paper/content/{paper_hash}",
+			"/get/paper/content/{paper_id}",
 			web::get().to(read_paper_content),
 		),
 		("/get/paper/infos/{page}", web::get().to(read_paper_info)),
 		("/post/paper/", web::post().to(post_new_paper)),
+		("/update/paper/", web::put().to(update_paper)),
 	]
 }
