@@ -1,7 +1,8 @@
 use crate::models;
-use actix_web::{web, HttpResponse, Responder, Route};
+use actix_web::{cookie::Cookie, web, HttpMessage, HttpRequest, HttpResponse, Responder, Route};
 use serde::Deserialize;
 use serde_json;
+use std::{collections::HashSet, sync::RwLock};
 
 // reader paper info list,each paper limit 5 row most
 const PAGE_AMOUNT: u64 = 5;
@@ -17,6 +18,38 @@ fn read_paper_content(path: web::Path<String>) -> impl Responder {
 	// copy string
 	let paper_hash: &str = &*path;
 	models::query_paper_content(paper_hash).unwrap_or_else(|_| String::from("server error"))
+}
+
+// actix web app state
+struct AppState {
+	token_set: RwLock<HashSet<String>>,
+}
+
+// get token and store token use uuid
+// TODO add passwd and user name
+fn login(req: HttpRequest, data: web::Data<AppState>) -> HttpResponse {
+	let token_set = &*data.token_set.read().unwrap();
+	match req.cookie("token") {
+		Some(ref token) if token_set.get(token.value()).is_some() => {
+			// already have token
+			// do nothing
+			HttpResponse::Ok().finish()
+		}
+		_ => loop {
+			let token = uuid::Uuid::new_v4().to_string();
+			if token_set.get(&token).is_some() {
+				// 重复那么就继续生成token
+				continue;
+			} else {
+				// get write lock and insert token
+				data.token_set.write().unwrap().insert(token.to_string());
+				let mut cookie = Cookie::new("token", token);
+				cookie.set_max_age(chrono::Duration::hours(24));
+				cookie.set_http_only(true);
+				break HttpResponse::Ok().cookie(cookie).finish();
+			}
+		},
+	}
 }
 
 #[derive(Deserialize)]
@@ -37,7 +70,6 @@ fn post_new_paper(paper: web::Json<PaperJsonParam>) -> impl Responder {
 	} = &*paper;
 	println!("posting paper {}", title);
 	let result = models::post_new_paper(title, author, content, tags);
-
 	result
 		.map(|_| String::from("Ok"))
 		.unwrap_or_else(|_| String::from("post new paper fail ; see log file"))
@@ -53,6 +85,29 @@ fn update_paper(body: web::Json<PaperJsonParam>) {
 	} = &*body;
 	models::update_paper(title, author, content, tags);
 	// TODO: add error handle
+}
+
+// insert tags into tags column
+// only append new tags use paper title
+#[derive(Deserialize)]
+struct PaperTagsParam {
+	title: String,
+	tags: Vec<String>,
+}
+
+fn update_tags(
+	req: HttpRequest,
+	data: web::Data<AppState>,
+	body: web::Json<PaperTagsParam>,
+) -> HttpResponse {
+	req.cookie("token")
+		.map_or(HttpResponse::Forbidden().finish(), |token| {
+			if data.token_set.read().unwrap().get(token.value()).is_some() {
+				HttpResponse::Ok().finish()
+			} else {
+				HttpResponse::Forbidden().finish()
+			}
+		})
 }
 
 fn alive_check(path: web::Path<String>) -> HttpResponse {
@@ -71,5 +126,7 @@ pub fn routes<'a>() -> Vec<(&'a str, Route)> {
 		("/get/paper/infos/{page}", web::get().to(read_paper_info)),
 		("/post/paper/", web::post().to(post_new_paper)),
 		("/update/paper/", web::put().to(update_paper)),
+		("/update/tags/", web::put().to(update_tags)),
+		("/login", web::post().to(login)),
 	]
 }
