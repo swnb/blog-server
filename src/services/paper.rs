@@ -20,35 +20,44 @@ fn read_paper_content(path: web::Path<String>) -> impl Responder {
 	models::query_paper_content(paper_hash).unwrap_or_else(|_| String::from("server error"))
 }
 
+// hashset store tokens
+type TokenSet = HashSet<String>;
+
 // actix web app state
 pub struct AppState {
-	pub token_set: RwLock<HashSet<String>>,
+	pub token_set: RwLock<TokenSet>,
+}
+
+// check cookie is authority or not
+fn is_authority(req: &HttpRequest, token_set: &TokenSet) -> bool {
+	req.cookie("token")
+		.and_then(|token| token_set.get(token.value()).map(|_| ()))
+		.is_some()
+}
+
+// set cookie token
+fn authority_response(token_set: &mut TokenSet) -> HttpResponse {
+	let cookie = loop {
+		// generate uuid
+		let token = uuid::Uuid::new_v4();
+		if token_set.insert(token.to_string()) {
+			let mut cookie = Cookie::new("token", token.to_string());
+			cookie.set_max_age(chrono::Duration::hours(24));
+			cookie.set_http_only(true);
+			break cookie;
+		}
+	};
+	HttpResponse::Ok().cookie(cookie).finish()
 }
 
 // get token and store token use uuid
 // TODO add passwd and user name
 fn login(req: HttpRequest, data: web::Data<AppState>) -> HttpResponse {
-	req.cookie("token")
-		.and_then(|token| {
-			let token_set = &*data.token_set.read().unwrap();
-			token_set.get(token.value()).map(|_| ())
-		})
-		.map_or_else(
-			|| {
-				let cookie = loop {
-					// generate uuid
-					let token = uuid::Uuid::new_v4();
-					if data.token_set.write().unwrap().insert(token.to_string()) {
-						let mut cookie = Cookie::new("token", token.to_string());
-						cookie.set_max_age(chrono::Duration::hours(24));
-						cookie.set_http_only(true);
-						break cookie;
-					}
-				};
-				HttpResponse::Ok().cookie(cookie).finish()
-			},
-			|_| HttpResponse::Ok().finish(),
-		)
+	if is_authority(&req, &data.token_set.read().unwrap()) {
+		HttpResponse::Ok().finish()
+	} else {
+		authority_response(&mut data.token_set.write().unwrap())
+	}
 }
 
 #[derive(Deserialize)]
