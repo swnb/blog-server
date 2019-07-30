@@ -21,35 +21,34 @@ fn read_paper_content(path: web::Path<String>) -> impl Responder {
 }
 
 // actix web app state
-struct AppState {
-	token_set: RwLock<HashSet<String>>,
+pub struct AppState {
+	pub token_set: RwLock<HashSet<String>>,
 }
 
 // get token and store token use uuid
 // TODO add passwd and user name
 fn login(req: HttpRequest, data: web::Data<AppState>) -> HttpResponse {
-	let token_set = &*data.token_set.read().unwrap();
-	match req.cookie("token") {
-		Some(ref token) if token_set.get(token.value()).is_some() => {
-			// already have token
-			// do nothing
-			HttpResponse::Ok().finish()
-		}
-		_ => loop {
-			let token = uuid::Uuid::new_v4().to_string();
-			if token_set.get(&token).is_some() {
-				// 重复那么就继续生成token
-				continue;
-			} else {
-				// get write lock and insert token
-				data.token_set.write().unwrap().insert(token.to_string());
-				let mut cookie = Cookie::new("token", token);
-				cookie.set_max_age(chrono::Duration::hours(24));
-				cookie.set_http_only(true);
-				break HttpResponse::Ok().cookie(cookie).finish();
-			}
-		},
-	}
+	req.cookie("token")
+		.and_then(|token| {
+			let token_set = &*data.token_set.read().unwrap();
+			token_set.get(token.value()).map(|_| ())
+		})
+		.map_or_else(
+			|| {
+				let cookie = loop {
+					// generate uuid
+					let token = uuid::Uuid::new_v4();
+					if data.token_set.write().unwrap().insert(token.to_string()) {
+						let mut cookie = Cookie::new("token", token.to_string());
+						cookie.set_max_age(chrono::Duration::hours(24));
+						cookie.set_http_only(true);
+						break cookie;
+					}
+				};
+				HttpResponse::Ok().cookie(cookie).finish()
+			},
+			|_| HttpResponse::Ok().finish(),
+		)
 }
 
 #[derive(Deserialize)]
