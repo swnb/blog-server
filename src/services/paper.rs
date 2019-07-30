@@ -6,18 +6,25 @@ use std::{collections::HashSet, sync::RwLock};
 
 // reader paper info list,each paper limit 5 row most
 const PAGE_AMOUNT: u64 = 5;
-fn read_paper_info(path: web::Path<(u64)>) -> impl Responder {
+fn read_paper_info_list(path: web::Path<(u64)>) -> HttpResponse {
 	let offset = *path - 1;
-	let result = models::query_papers(PAGE_AMOUNT, offset * PAGE_AMOUNT).unwrap(); // FIXME: rm this unwrap
-
-	serde_json::to_string(&result).unwrap_or_else(|_| String::from("server error"))
+	match models::query_papers(PAGE_AMOUNT, offset * PAGE_AMOUNT) {
+		Ok(list) => match serde_json::to_string(&list) {
+			Ok(result) => HttpResponse::Ok().body(result), // TODO add log and better response
+			Err(_) => HttpResponse::InternalServerError().finish(),
+		},
+		Err(_) => HttpResponse::NotFound().finish(),
+	}
 }
 
 // reader paper content by paper hash id
-fn read_paper_content(path: web::Path<String>) -> impl Responder {
+fn read_paper_content(path: web::Path<String>) -> HttpResponse {
 	// copy string
 	let paper_hash: &str = &*path;
-	models::query_paper_content(paper_hash).unwrap_or_else(|_| String::from("server error"))
+	match models::query_paper_content(paper_hash) {
+		Ok(result) => HttpResponse::Ok().body(result), // TODO add better log and response
+		Err(_) => HttpResponse::NotFound().finish(),
+	}
 }
 
 // hashset store tokens
@@ -69,7 +76,15 @@ struct PaperJsonParam {
 }
 
 // post new paper
-fn post_new_paper(paper: web::Json<PaperJsonParam>) -> impl Responder {
+fn post_new_paper(
+	req: HttpRequest,
+	data: web::Data<AppState>,
+	paper: web::Json<PaperJsonParam>,
+) -> HttpResponse {
+	if !is_authority(&req, &data.token_set.read().unwrap()) {
+		return HttpResponse::Forbidden().finish();
+	}
+
 	let PaperJsonParam {
 		title,
 		content,
@@ -78,13 +93,23 @@ fn post_new_paper(paper: web::Json<PaperJsonParam>) -> impl Responder {
 	} = &*paper;
 	println!("posting paper {}", title);
 	let result = models::post_new_paper(title, author, content, tags);
-	result
-		.map(|_| String::from("Ok"))
-		.unwrap_or_else(|_| String::from("post new paper fail ; see log file"))
+	match result {
+		Ok(_) => HttpResponse::Ok().body("success post new paper"),
+		// TODO log error
+		Err(_) => HttpResponse::InternalServerError().finish(),
+	}
 }
 
 // update paper use paper title
-fn update_paper(body: web::Json<PaperJsonParam>) {
+fn update_paper(
+	req: HttpRequest,
+	data: web::Data<AppState>,
+	body: web::Json<PaperJsonParam>,
+) -> HttpResponse {
+	if !is_authority(&req, &data.token_set.read().unwrap()) {
+		return HttpResponse::Forbidden().finish();
+	}
+
 	let PaperJsonParam {
 		title,
 		author,
@@ -93,6 +118,7 @@ fn update_paper(body: web::Json<PaperJsonParam>) {
 	} = &*body;
 	models::update_paper(title, author, content, tags);
 	// TODO: add error handle
+	HttpResponse::Ok().finish()
 }
 
 // insert tags into tags column
@@ -103,25 +129,25 @@ struct PaperTagsParam {
 	tags: Vec<String>,
 }
 
-fn update_tags(
+// only append tags , not replace tags
+fn put_tags(
 	req: HttpRequest,
 	data: web::Data<AppState>,
 	body: web::Json<PaperTagsParam>,
 ) -> HttpResponse {
-	req.cookie("token")
-		.map_or(HttpResponse::Forbidden().finish(), |token| {
-			if data.token_set.read().unwrap().get(token.value()).is_some() {
-				HttpResponse::Ok().finish()
-			} else {
-				HttpResponse::Forbidden().finish()
-			}
-		})
+	if !is_authority(&req, &data.token_set.read().unwrap()) {
+		return HttpResponse::Forbidden().finish();
+	}
+	let PaperTagsParam { title, tags } = &*body;
+	match models::add_tags(title, tags) {
+		Ok(_) => HttpResponse::Ok().finish(),
+		Err(_) => HttpResponse::InternalServerError().finish(),
+	}
 }
 
 fn alive_check(path: web::Path<String>) -> HttpResponse {
-	let phrase: String = path.clone();
-	let mut response = HttpResponse::Ok();
-	response.body(phrase)
+	let phrase: String = path.to_owned();
+	HttpResponse::Ok().body(phrase)
 }
 
 pub fn routes<'a>() -> Vec<(&'a str, Route)> {
@@ -131,10 +157,13 @@ pub fn routes<'a>() -> Vec<(&'a str, Route)> {
 			"/get/paper/content/{paper_id}",
 			web::get().to(read_paper_content),
 		),
-		("/get/paper/infos/{page}", web::get().to(read_paper_info)),
+		(
+			"/get/paper/infos/{page}",
+			web::get().to(read_paper_info_list),
+		),
 		("/post/paper/", web::post().to(post_new_paper)),
 		("/update/paper/", web::put().to(update_paper)),
-		("/update/tags/", web::put().to(update_tags)),
+		("/put/tags/", web::put().to(put_tags)),
 		("/login", web::post().to(login)),
 	]
 }
