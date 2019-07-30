@@ -165,7 +165,16 @@ pub fn update_paper(
 
 // insert tags into papers
 // append some tags use same title
-pub fn add_tags(title: String, tags: Vec<String>) {}
+pub fn add_tags(title: &str, tags: &[String]) -> Result<(), crate::StdError> {
+	let connection = &*get_connection().get().expect("can't set connection");
+	let raw_sql = format!(
+		"update papers set tags = tags || '{}' where title = '{}'",
+		array_to_sql(&tags),
+		title
+	);
+	diesel::sql_query(raw_sql).execute(connection)?; // FIXME: rm unwrap()
+	Ok(())
+}
 
 #[cfg(test)]
 mod tests {
