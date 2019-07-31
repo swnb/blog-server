@@ -27,10 +27,10 @@ fn read_paper_info_list(path: web::Path<(u64)>) -> HttpResponse {
 // reader paper content by paper id
 fn read_paper_content(path: web::Path<String>) -> HttpResponse {
 	// copy string
-	let paper_hash: &str = &*path;
-	let result = models::query_paper_content(paper_hash);
+	let paper_id: &str = &*path;
+	let result = models::query_paper_content(paper_id);
 	match result {
-		Ok(result) => HttpResponse::Ok().body(result), // TODO add better log and response
+		Ok(paper_structure) => Response::success(paper_structure), // TODO add better log and response
 		Err(Error::DataBaseError(reason)) => {
 			println!("reason {}", reason); // TODO add log
 			Response::server_error()
