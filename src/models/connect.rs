@@ -8,11 +8,11 @@ use r2d2_diesel::ConnectionManager;
 
 pub type Pool = r2d2::Pool<ConnectionManager<PgConnection>>;
 lazy_static! {
-	static ref connection_pool: Pool = create_connection();
+	static ref CONNECTION_POOL: Pool = create_connection();
 }
 
 pub fn get_connection() -> Pool {
-	connection_pool.clone()
+	CONNECTION_POOL.clone()
 }
 
 // get connection;
