@@ -1,6 +1,9 @@
 pub mod connect;
+pub mod error;
+
 use super::markdown_parser;
 use connect::get_connection;
+use error::Error;
 use {
 	diesel::prelude::*,
 	serde::{Deserialize, Serialize},
@@ -50,8 +53,8 @@ pub struct PaperInfo {
 	is_del: bool,
 }
 // query paper list with page_amount and page index
-pub fn query_papers(page_amount: u64, offset: u64) -> Result<Vec<PaperInfo>, ()> {
-	let connection = &*get_connection().get().expect("can't set connection");
+pub fn query_papers(page_amount: u64, offset: u64) -> Result<Vec<PaperInfo>, Error> {
+	let connection = &*get_connection().get().expect("can't get connection");
 	use self::papers::dsl::*;
 
 	papers
@@ -59,7 +62,7 @@ pub fn query_papers(page_amount: u64, offset: u64) -> Result<Vec<PaperInfo>, ()>
 		.limit(page_amount as i64)
 		.offset(offset as i64)
 		.load::<PaperInfo>(connection)
-		.map_err(|err| println!("error when query papers {}", err))
+		.map_err(Error::from)
 }
 
 // query paper content use paper id and parse content into json struct;
@@ -69,32 +72,34 @@ pub struct PaperContent {
 	id: String,
 	content: String,
 }
-// TODO: return error result instead of ()
-pub fn query_paper_content(paper_id: &str) -> Result<String, ()> {
-	let connection = &*get_connection().get().expect("can't set connection");
-	use self::papers::dsl::*;
 
-	papers
-		.select((id, content))
-		.filter(id.eq(paper_id))
+// parse paper content
+// first make content html
+// then parse html into json struct
+fn parse_paper_content(content: &str) -> Result<String, Error> {
+	Ok(markdown_parser::parse_markdown2html_json_struct(content))
+}
+
+fn parse_paper_content_from_base64(content: &str) -> Result<String, Error> {
+	use error::ignore;
+	let content = base64::decode(content).map_err(ignore)?;
+	let content = String::from_utf8(content).map_err(ignore)?;
+	parse_paper_content(&content)
+}
+
+pub fn query_paper_content(paper_id: &str) -> Result<String, Error> {
+	let connection = &*get_connection().get().expect("can't get connection");
+	use self::papers::dsl;
+	dsl::papers
+		.select((dsl::id, dsl::content))
+		.filter(dsl::id.eq(paper_id))
 		.limit(1)
 		.first::<PaperContent>(connection)
-		.map_err(|err| println!("error when query paper content {}", err))
-		.and_then(
-			|PaperContent {
-			     content: paper_content,
-			     ..
-			 }| {
-				base64::decode(&paper_content)
-					.map_err(|_| ())
-					.and_then(|paper_content| String::from_utf8(paper_content).map_err(|_| ()))
-					.map(|paper_content: String| {
-						markdown_parser::parse_markdown2html_json_struct(&paper_content)
-					})
-					.map_err(|_| ())
-			},
-		)
-		.map_err(|_| ())
+		.map_err(Error::from)
+		.and_then(|paper_content| {
+			let PaperContent { ref content, .. } = paper_content;
+			parse_paper_content_from_base64(content).map_err(|_| Error::ParseError)
+		})
 }
 
 // insert new paper, don't need to insert id , default use uuid_v1;
@@ -103,13 +108,14 @@ pub fn query_paper_content(paper_id: &str) -> Result<String, ()> {
 // don't need is_draft default true,
 // don't need is_del default false,
 // post new_paper_api
+// post only one paper
 pub fn post_new_paper(
 	param_title: &str,
 	param_author: &str,
 	param_content: &str,
 	param_tags: &[String],
-) -> Result<(), ()> {
-	let connection = &*get_connection().get().expect("can't set connection");
+) -> Result<usize, Error> {
+	let connection = &*get_connection().get().expect("can't get connection");
 	use self::papers::dsl::*;
 	diesel::insert_into(papers)
 		.values((
@@ -119,8 +125,7 @@ pub fn post_new_paper(
 			tags.eq(param_tags),
 		))
 		.execute(connection)
-		.unwrap(); // FIXME: rm this unwrap
-	Ok(())
+		.map_err(Error::from)
 }
 
 // format array into postgresql
@@ -142,8 +147,8 @@ pub fn update_paper(
 	param_author: &str,
 	param_content: &str,
 	param_tags: &[String],
-) {
-	let connection = &*get_connection().get().expect("can't set connection");
+) -> Result<usize, Error> {
+	let connection = &*get_connection().get().expect("can't get connection");
 	let param_content = base64::encode(&param_content);
 	let raw_sql = format!(
 		"update papers set 
@@ -160,20 +165,21 @@ pub fn update_paper(
 
 	diesel::sql_query(raw_sql)
 		.execute(connection)
-		.expect("err happend");
+		.map_err(Error::from)
 }
 
 // insert tags into papers
 // append some tags use same title
-pub fn add_tags(title: &str, tags: &[String]) -> Result<(), crate::StdError> {
-	let connection = &*get_connection().get().expect("can't set connection");
+pub fn add_tags(title: &str, tags: &[String]) -> Result<usize, Error> {
+	let connection = &*get_connection().get().expect("can't get connection");
 	let raw_sql = format!(
 		"update papers set tags = tags || '{}' where title = '{}'",
 		array_to_sql(&tags),
 		title
 	);
-	diesel::sql_query(raw_sql).execute(connection)?; // FIXME: rm unwrap()
-	Ok(())
+	diesel::sql_query(raw_sql)
+		.execute(connection)
+		.map_err(Error::from)
 }
 
 #[cfg(test)]

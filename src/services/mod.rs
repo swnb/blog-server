@@ -1,4 +1,6 @@
 mod paper;
+mod response;
+
 use actix_web::{web, Scope};
 use std::{collections::HashSet, sync::RwLock};
 
