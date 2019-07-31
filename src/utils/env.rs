@@ -1,9 +1,15 @@
+use log::{info, trace};
 use std::{
 	env, fs,
 	io::{BufRead, BufReader},
 };
 
-pub fn set_env() {
+enum Mode {
+	Dev,
+	Pro,
+}
+
+fn parse_dot_env_file() {
 	let current_dir = env::current_dir().expect("can't get current dir");
 
 	let env_file_path = current_dir.join(".env");
@@ -24,8 +30,34 @@ pub fn set_env() {
 				let key = &line[..index].trim();
 				let value = &line[(index + 1)..].trim();
 				env::set_var(key, value);
-				println!("set key {} value {}", key, value);
+				trace!("set key {} value {}", key, value);
 			}
 		}
 	})
+}
+
+fn get_mode() -> Mode {
+	match env::var("MODE") {
+		Ok(ref mode) if mode == "develop" => Mode::Dev,
+		Ok(ref mode) if mode == "product" => Mode::Pro,
+		_ => {
+			println!("env MODE must set with develop or product");
+			std::process::exit(100);
+		}
+	}
+}
+
+pub fn set_env() {
+	parse_dot_env_file();
+	let mode = get_mode();
+	match mode {
+		Mode::Dev => {
+			super::logger::set_logger("blog=trace,actix_web=info");
+			info!("develop mode");
+		}
+		Mode::Pro => {
+			super::logger::set_logger("blog=info,actix_web=info");
+			info!("product mode");
+		}
+	}
 }
