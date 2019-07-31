@@ -1,16 +1,26 @@
-use super::response::*;
+use super::response::Response;
 use crate::models;
+
 use actix_web::{cookie::Cookie, web, HttpMessage, HttpRequest, HttpResponse, Route};
+use models::error::Error;
 use serde::Deserialize;
 use std::{collections::HashSet, sync::RwLock};
 
 // reader paper info list,each paper limit 5 row most
 const PAGE_AMOUNT: u64 = 5;
 fn read_paper_info_list(path: web::Path<(u64)>) -> HttpResponse {
-	let offset = *path - 1;
-	match models::query_papers(PAGE_AMOUNT, offset * PAGE_AMOUNT) {
-		Ok(list) => HttpResponse::Ok().json(CustomResponse::success(list)), // TODO add log
-		Err(_) => HttpResponse::NotFound().json(CustomResponse::not_found()),
+	let index = *path - 1;
+	let offset = index * PAGE_AMOUNT;
+
+	let result = models::query_papers(PAGE_AMOUNT, offset);
+	match result {
+		Ok(list) => Response::success(list),
+		Err(Error::DataBaseError(reason)) => {
+			println!("reason {}", reason); // TODO add log
+			Response::server_error()
+		}
+		Err(Error::NotFound) => Response::not_found(),
+		_ => Response::bad_request(),
 	}
 }
 
@@ -18,9 +28,15 @@ fn read_paper_info_list(path: web::Path<(u64)>) -> HttpResponse {
 fn read_paper_content(path: web::Path<String>) -> HttpResponse {
 	// copy string
 	let paper_hash: &str = &*path;
-	match models::query_paper_content(paper_hash) {
+	let result = models::query_paper_content(paper_hash);
+	match result {
 		Ok(result) => HttpResponse::Ok().body(result), // TODO add better log and response
-		Err(_) => HttpResponse::NotFound().json(CustomResponse::not_found()),
+		Err(Error::DataBaseError(reason)) => {
+			println!("reason {}", reason); // TODO add log
+			Response::server_error()
+		}
+		Err(Error::NotFound) => Response::not_found(),
+		_ => HttpResponse::BadRequest().finish(),
 	}
 }
 
@@ -79,7 +95,7 @@ fn post_new_paper(
 	paper: web::Json<PaperJsonParam>,
 ) -> HttpResponse {
 	if !is_authority(&req, &data.token_set.read().unwrap()) {
-		return HttpResponse::Forbidden().json(CustomResponse::not_authentication());
+		return Response::not_authentication();
 	}
 
 	let PaperJsonParam {
@@ -91,9 +107,14 @@ fn post_new_paper(
 	println!("posting paper {}", title);
 	let result = models::post_new_paper(title, author, content, tags);
 	match result {
-		Ok(_) => HttpResponse::Ok().json(CustomResponse::success("")),
-		// TODO log error
-		Err(_) => HttpResponse::InternalServerError().json(CustomResponse::server_error()),
+		Ok(_) => Response::success(""),
+		Err(error) => match error {
+			Error::DataBaseError(reason) => {
+				println!("reason {}", reason); // TODO add log
+				Response::server_error()
+			}
+			_ => Response::bad_request(),
+		},
 	}
 }
 
@@ -104,7 +125,7 @@ fn update_paper(
 	body: web::Json<PaperJsonParam>,
 ) -> HttpResponse {
 	if !is_authority(&req, &data.token_set.read().unwrap()) {
-		return HttpResponse::Forbidden().json(CustomResponse::not_authentication());
+		return Response::not_authentication();
 	}
 
 	let PaperJsonParam {
@@ -113,9 +134,17 @@ fn update_paper(
 		content,
 		tags,
 	} = &*body;
-	models::update_paper(title, author, content, tags);
-	// TODO: add error handle
-	HttpResponse::Ok().json(CustomResponse::success(""))
+	let result = models::update_paper(title, author, content, tags);
+	match result {
+		Ok(_) => Response::success(""),
+		Err(error) => match error {
+			Error::DataBaseError(reason) => {
+				println!("reason {}", reason); // TODO add log
+				Response::server_error()
+			}
+			_ => Response::bad_request(),
+		},
+	}
 }
 
 // insert tags into tags column
@@ -133,24 +162,29 @@ fn put_tags(
 	body: web::Json<PaperTagsParam>,
 ) -> HttpResponse {
 	if !is_authority(&req, &data.token_set.read().unwrap()) {
-		return HttpResponse::Forbidden().json(CustomResponse::not_authentication());
+		return Response::not_authentication();
 	}
 	let PaperTagsParam { title, tags } = &*body;
 	match models::add_tags(title, tags) {
-		Ok(_) => HttpResponse::Ok().json(CustomResponse::success("")),
-		Err(_) => HttpResponse::InternalServerError().json(CustomResponse::server_error()),
+		Ok(_) => Response::success(""),
+		Err(error) => match error {
+			Error::DataBaseError(reason) => {
+				println!("reason {}", reason); // TODO add log
+				Response::server_error()
+			}
+			_ => Response::bad_request(),
+		},
 	}
 }
 
-fn alive_check(path: web::Path<String>) -> HttpResponse {
-	let phrase: String = path.to_owned();
-	HttpResponse::Ok().json(CustomResponse::success(phrase))
+fn alive_check() -> HttpResponse {
+	Response::success("success init")
 }
 
 pub fn routes<'a>() -> Vec<(&'a str, Route)> {
 	use web::{get, post, put};
 	vec![
-		("/check/{phrase}", get().to(alive_check)),
+		("/check", get().to(alive_check)),
 		(
 			"/get/paper/content/{paper_id}",
 			get().to(read_paper_content),
