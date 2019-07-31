@@ -60,4 +60,5 @@ pub fn set_env() {
 			info!("product mode");
 		}
 	}
+	env::var("DATABASE_URL").expect("DATABASE_URL not set");
 }
