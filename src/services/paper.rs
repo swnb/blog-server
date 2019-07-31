@@ -1,81 +1,21 @@
+use super::response::*;
 use crate::models;
 use actix_web::{cookie::Cookie, web, HttpMessage, HttpRequest, HttpResponse, Route};
-use serde::{Deserialize, Serialize};
-use serde_repr::*;
+use serde::Deserialize;
 use std::{collections::HashSet, sync::RwLock};
-
-// custom response with self define response code
-#[derive(Serialize_repr, Deserialize_repr, PartialEq, Debug)]
-#[repr(u8)]
-enum CustomResponseCode {
-	Success = 0,
-	Null = 100,
-	ServerError = 210,
-	NotAuthentication = 220,
-}
-
-#[derive(Serialize)]
-struct CustomResponse<'a, T> {
-	// 0 response success
-	// 100 response not found any data
-	// 200 repsonse server error
-	// 210 not authentication
-	code: CustomResponseCode,
-	data: T,
-	detail: &'a str,
-}
-
-impl<'a, T> CustomResponse<'a, T>
-where
-	T: Serialize,
-{
-	fn Success(data: T) -> Self {
-		CustomResponse {
-			code: CustomResponseCode::Success,
-			data,
-			detail: "",
-		}
-	}
-}
-
-impl<'a> CustomResponse<'a, &'a str> {
-	fn not_found() -> Self {
-		CustomResponse {
-			code: CustomResponseCode::Null,
-			data: "",
-			detail: "found nothing",
-		}
-	}
-
-	fn server_error() -> Self {
-		CustomResponse {
-			code: CustomResponseCode::ServerError,
-			data: "",
-			detail: "something wrong happen",
-		}
-	}
-
-	fn not_authentication() -> Self {
-		CustomResponse {
-			code: CustomResponseCode::NotAuthentication,
-			data: "",
-			detail: "not authorization",
-		}
-	}
-}
 
 // reader paper info list,each paper limit 5 row most
 const PAGE_AMOUNT: u64 = 5;
 fn read_paper_info_list(path: web::Path<(u64)>) -> HttpResponse {
 	let offset = *path - 1;
 	match models::query_papers(PAGE_AMOUNT, offset * PAGE_AMOUNT) {
-		Ok(list) => HttpResponse::Ok().json(CustomResponse::Success(list)), // TODO add log
+		Ok(list) => HttpResponse::Ok().json(CustomResponse::success(list)), // TODO add log
 		Err(_) => HttpResponse::NotFound().json(CustomResponse::not_found()),
 	}
 }
 
 // reader paper content by paper id
-fn read_paper_content<'a>(path: web::Path<String>) -> HttpResponse {
+fn read_paper_content(path: web::Path<String>) -> HttpResponse {
 	// copy string
 	let paper_hash: &str = &*path;
 	match models::query_paper_content(paper_hash) {
@@ -151,7 +91,7 @@ fn post_new_paper(
 	println!("posting paper {}", title);
 	let result = models::post_new_paper(title, author, content, tags);
 	match result {
-		Ok(_) => HttpResponse::Ok().json(CustomResponse::Success("")),
+		Ok(_) => HttpResponse::Ok().json(CustomResponse::success("")),
 		// TODO log error
 		Err(_) => HttpResponse::InternalServerError().json(CustomResponse::server_error()),
 	}
@@ -175,7 +115,7 @@ fn update_paper(
 	} = &*body;
 	models::update_paper(title, author, content, tags);
 	// TODO: add error handle
-	HttpResponse::Ok().json(CustomResponse::Success(""))
+	HttpResponse::Ok().json(CustomResponse::success(""))
 }
 
 // insert tags into tags column
@@ -197,30 +137,28 @@ fn put_tags(
 	}
 	let PaperTagsParam { title, tags } = &*body;
 	match models::add_tags(title, tags) {
-		Ok(_) => HttpResponse::Ok().json(CustomResponse::Success("")),
+		Ok(_) => HttpResponse::Ok().json(CustomResponse::success("")),
 		Err(_) => HttpResponse::InternalServerError().json(CustomResponse::server_error()),
 	}
 }
 
 fn alive_check(path: web::Path<String>) -> HttpResponse {
 	let phrase: String = path.to_owned();
-	HttpResponse::Ok().json(CustomResponse::Success(phrase))
+	HttpResponse::Ok().json(CustomResponse::success(phrase))
 }
 
 pub fn routes<'a>() -> Vec<(&'a str, Route)> {
+	use web::{get, post, put};
 	vec![
-		("/check/{phrase}", web::get().to(alive_check)),
+		("/check/{phrase}", get().to(alive_check)),
 		(
 			"/get/paper/content/{paper_id}",
-			web::get().to(read_paper_content),
+			get().to(read_paper_content),
 		),
-		(
-			"/get/paper/infos/{page}",
-			web::get().to(read_paper_info_list),
-		),
-		("/post/paper/", web::post().to(post_new_paper)),
-		("/update/paper/", web::put().to(update_paper)),
-		("/put/tags/", web::put().to(put_tags)),
-		("/login", web::post().to(login)),
+		("/get/paper/infos/{page}", get().to(read_paper_info_list)),
+		("/post/paper/", post().to(post_new_paper)),
+		("/update/paper/", put().to(update_paper)),
+		("/put/tags/", put().to(put_tags)),
+		("/login", post().to(login)),
 	]
 }
