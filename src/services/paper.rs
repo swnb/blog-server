@@ -1,5 +1,6 @@
 use super::response::Response;
 use crate::models;
+use log::{error, trace};
 
 use actix_web::{cookie::Cookie, web, HttpMessage, HttpRequest, HttpResponse, Route};
 use models::error::Error;
@@ -16,7 +17,7 @@ fn read_paper_info_list(path: web::Path<(u64)>) -> HttpResponse {
 	match result {
 		Ok(list) => Response::success(list),
 		Err(Error::DataBaseError(reason)) => {
-			println!("reason {}", reason); // TODO add log
+			error!("read paper info list: {}", reason);
 			Response::server_error()
 		}
 		Err(Error::NotFound) => Response::not_found(),
@@ -30,9 +31,9 @@ fn read_paper_content(path: web::Path<String>) -> HttpResponse {
 	let paper_id: &str = &*path;
 	let result = models::query_paper_content(paper_id);
 	match result {
-		Ok(paper_structure) => Response::success(paper_structure), // TODO add better log and response
+		Ok(paper_structure) => Response::success(paper_structure),
 		Err(Error::DataBaseError(reason)) => {
-			println!("reason {}", reason); // TODO add log
+			error!("read_paper_content: {}", reason);
 			Response::server_error()
 		}
 		Err(Error::NotFound) => Response::not_found(),
@@ -104,13 +105,13 @@ fn post_new_paper(
 		author,
 		tags,
 	} = &*paper;
-	println!("posting paper {}", title);
+	trace!("posting paper {}", title);
 	let result = models::post_new_paper(title, author, content, tags);
 	match result {
 		Ok(_) => Response::success(""),
 		Err(error) => match error {
 			Error::DataBaseError(reason) => {
-				println!("reason {}", reason); // TODO add log
+				error!("post paper : {}", reason);
 				Response::server_error()
 			}
 			_ => Response::bad_request(),
@@ -127,7 +128,7 @@ fn update_paper(
 	if !is_authority(&req, &data.token_set.read().unwrap()) {
 		return Response::not_authentication();
 	}
-
+	trace!("update paper");
 	let PaperJsonParam {
 		title,
 		author,
@@ -139,7 +140,7 @@ fn update_paper(
 		Ok(_) => Response::success(""),
 		Err(error) => match error {
 			Error::DataBaseError(reason) => {
-				println!("reason {}", reason); // TODO add log
+				error!("update paper: {}", reason);
 				Response::server_error()
 			}
 			_ => Response::bad_request(),
@@ -164,12 +165,13 @@ fn put_tags(
 	if !is_authority(&req, &data.token_set.read().unwrap()) {
 		return Response::not_authentication();
 	}
+	trace!("append paper tags");
 	let PaperTagsParam { title, tags } = &*body;
 	match models::add_tags(title, tags) {
 		Ok(_) => Response::success(""),
 		Err(error) => match error {
 			Error::DataBaseError(reason) => {
-				println!("reason {}", reason); // TODO add log
+				error!("append tags: {}", reason);
 				Response::server_error()
 			}
 			_ => Response::bad_request(),
@@ -178,6 +180,7 @@ fn put_tags(
 }
 
 fn alive_check() -> HttpResponse {
+	trace!("check whether server alive or not");
 	Response::success("success init")
 }
 
