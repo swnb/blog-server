@@ -8,12 +8,13 @@ use {
 	diesel::prelude::*,
 	serde::{Deserialize, Serialize},
 	std::time::SystemTime,
+	uuid::Uuid,
 };
 
 // papers table schema
 table! {
 	papers (id) {
-		id -> Varchar,
+		id -> Uuid,
 		title -> Varchar,
 		author -> Varchar,
 		content -> Text,
@@ -29,7 +30,7 @@ table! {
 #[derive(Queryable, Deserialize, Serialize, Insertable)]
 #[table_name = "papers"]
 pub struct Paper {
-	id: String,
+	id: Uuid,
 	title: String,
 	content: String,
 	author: String,
@@ -44,7 +45,7 @@ pub struct Paper {
 #[derive(Queryable, Deserialize, Serialize, Insertable)]
 #[table_name = "papers"]
 pub struct PaperInfo {
-	id: String,
+	id: Uuid,
 	title: String,
 	author: String,
 	create_at: SystemTime,
@@ -69,7 +70,7 @@ pub fn query_papers(page_amount: u64, offset: u64) -> Result<Vec<PaperInfo>, Err
 #[derive(Queryable, Deserialize, Serialize, Insertable)]
 #[table_name = "papers"]
 pub struct PaperContent {
-	id: String,
+	id: Uuid,
 	content: String,
 }
 
@@ -90,6 +91,7 @@ fn parse_paper_content_from_base64(content: &str) -> Result<String, Error> {
 pub fn query_paper_content(paper_id: &str) -> Result<String, Error> {
 	let connection = &*get_connection().get().expect("can't get connection");
 	use self::papers::dsl;
+	let paper_id = Uuid::parse_str(paper_id).map_err(|_| Error::ParseError)?;
 	dsl::papers
 		.select((dsl::id, dsl::content))
 		.filter(dsl::id.eq(paper_id))
