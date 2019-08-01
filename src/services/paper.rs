@@ -12,7 +12,7 @@ const PAGE_AMOUNT: u64 = 5;
 fn read_paper_info_list(path: web::Path<(u64)>) -> HttpResponse {
 	let index = *path - 1;
 	let offset = index * PAGE_AMOUNT;
-
+	trace!("get paper info list page index {}", index);
 	let result = models::query_papers(PAGE_AMOUNT, offset);
 	match result {
 		Ok(list) => Response::success(list),
@@ -29,6 +29,7 @@ fn read_paper_info_list(path: web::Path<(u64)>) -> HttpResponse {
 fn read_paper_content(path: web::Path<String>) -> HttpResponse {
 	// copy string
 	let paper_id: &str = &*path;
+	trace!("read paper content with paper id {}", paper_id);
 	let result = models::query_paper_content(paper_id);
 	match result {
 		Ok(paper_structure) => Response::success(paper_structure),
@@ -74,9 +75,12 @@ fn authority_response(token_set: &mut TokenSet) -> HttpResponse {
 // get token and store token use uuid
 // TODO add passwd and user name
 fn login(req: HttpRequest, data: web::Data<AppState>) -> HttpResponse {
+	trace!("try to login");
 	if is_authority(&req, &data.token_set.read().unwrap()) {
+		trace!("already login");
 		HttpResponse::Ok().finish()
 	} else {
+		trace!("login fail");
 		authority_response(&mut data.token_set.write().unwrap())
 	}
 }
@@ -99,6 +103,7 @@ fn post_new_paper(
 		return Response::not_authentication();
 	}
 
+	trace!("post new paper");
 	let PaperJsonParam {
 		title,
 		content,
