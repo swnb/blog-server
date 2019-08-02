@@ -2,7 +2,7 @@ use diesel::pg::PgConnection;
 use lazy_static;
 use std::env;
 use std::{thread, time};
-
+use super::error::Error;
 use r2d2;
 use r2d2_diesel::ConnectionManager;
 
@@ -11,8 +11,8 @@ lazy_static! {
 	static ref CONNECTION_POOL: Pool = create_connection();
 }
 
-pub fn get_connection() -> Pool {
-	CONNECTION_POOL.clone()
+pub fn get_connection() -> Result<r2d2::PooledConnection<r2d2_diesel::ConnectionManager<diesel::PgConnection>>, Error> {
+	 CONNECTION_POOL.clone().get().map_err(|_|Error::DataBaseConnectError)
 }
 
 // get connection;

@@ -54,7 +54,7 @@ pub struct PaperInfo {
 }
 // query paper list with page_amount and page index
 pub fn query_papers(page_amount: u64, offset: u64) -> Result<Vec<PaperInfo>, Error> {
-	let connection = &*get_connection().get().expect("can't get connection");
+	let connection = &*get_connection()?;
 	use self::papers::dsl::*;
 
 	papers
@@ -71,7 +71,7 @@ pub fn query_papers_by_tags(
 	page_amount: u64,
 	offset: u64,
 ) -> Result<Vec<PaperInfo>, Error> {
-	let connection = &*get_connection().get().expect("can't get connection");
+	let connection = &*get_connection()?;
 	use self::papers::dsl::*;
 
 	papers
@@ -92,7 +92,7 @@ pub struct PaperContent {
 }
 
 pub fn query_paper_content(paper_id: &str) -> Result<String, Error> {
-	let connection = &*get_connection().get().expect("can't get connection");
+	let connection = &*get_connection()?;
 	use self::papers::dsl;
 	let paper_id = Uuid::parse_str(paper_id).map_err(|_| Error::ParseError)?;
 	dsl::papers
@@ -128,7 +128,7 @@ pub fn post_new_paper(
 	param_content: &str,
 	param_tags: &[String],
 ) -> Result<usize, Error> {
-	let connection = &*get_connection().get().expect("can't get connection");
+	let connection = &*get_connection()?;
 	use self::papers::dsl::*;
 	// parse paper content into json structure
 	let paper_content = parse_paper_content(param_content).map_err(|_| Error::ParseError)?;
@@ -166,7 +166,7 @@ pub fn update_paper(
 	param_content: &str,
 	param_tags: &[String],
 ) -> Result<usize, Error> {
-	let connection = &*get_connection().get().expect("can't get connection");
+	let connection = &*get_connection()?;
 
 	// parse paper content into json structure
 	let paper_content = parse_paper_content(param_content).map_err(|_| Error::ParseError)?;
@@ -193,7 +193,7 @@ pub fn update_paper(
 // insert tags into papers
 // append some tags use same title
 pub fn add_tags(title: &str, tags: &[String]) -> Result<usize, Error> {
-	let connection = &*get_connection().get().expect("can't get connection");
+	let connection = &*get_connection()?;
 	let raw_sql = format!(
 		"update papers set tags = tags || '{}' where title = '{}'",
 		array_to_sql(&tags),

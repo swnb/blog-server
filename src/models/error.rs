@@ -1,13 +1,10 @@
 use diesel::result::Error as SqlError;
 
-pub fn ignore<T>(_: T) -> Error {
-	Error::Other
-}
-
 pub enum Error {
 	DataBaseError(String),
 	ParseError,
 	NotFound,
+	DataBaseConnectError,
 	Other,
 }
 
