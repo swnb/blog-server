@@ -7,7 +7,6 @@ use error::Error;
 use {
 	diesel::prelude::*,
 	serde::{Deserialize, Serialize},
-	std::time::SystemTime,
 	uuid::Uuid,
 };
 
@@ -34,8 +33,8 @@ pub struct Paper {
 	title: String,
 	content: String,
 	author: String,
-	create_at: SystemTime,
-	change_records: Vec<SystemTime>,
+	create_at: chrono::NaiveDateTime,
+	change_records: Vec<chrono::NaiveDateTime>,
 	tags: Vec<String>,
 	is_draft: bool,
 	is_del: bool,
@@ -48,7 +47,7 @@ pub struct PaperInfo {
 	id: Uuid,
 	title: String,
 	author: String,
-	create_at: SystemTime,
+	create_at: chrono::NaiveDateTime,
 	tags: Vec<String>,
 	is_draft: bool,
 	is_del: bool,
@@ -74,20 +73,6 @@ pub struct PaperContent {
 	content: String,
 }
 
-// parse paper content
-// first make content html
-// then parse html into json struct
-fn parse_paper_content(content: &str) -> Result<String, Error> {
-	Ok(markdown_parser::parse_markdown2html_json_struct(content))
-}
-
-fn parse_paper_content_from_base64(content: &str) -> Result<String, Error> {
-	use error::ignore;
-	let content = base64::decode(content).map_err(ignore)?;
-	let content = String::from_utf8(content).map_err(ignore)?;
-	parse_paper_content(&content)
-}
-
 pub fn query_paper_content(paper_id: &str) -> Result<String, Error> {
 	let connection = &*get_connection().get().expect("can't get connection");
 	use self::papers::dsl;
@@ -100,8 +85,16 @@ pub fn query_paper_content(paper_id: &str) -> Result<String, Error> {
 		.map_err(Error::from)
 		.and_then(|paper_content| {
 			let PaperContent { ref content, .. } = paper_content;
-			parse_paper_content_from_base64(content).map_err(|_| Error::ParseError)
+			let content = base64::decode(content).map_err(|_| Error::ParseError)?;
+			String::from_utf8(content).map_err(|_| Error::ParseError)
 		})
+}
+
+// parse paper content
+// first make content html
+// then parse html into json struct
+fn parse_paper_content(content: &str) -> Result<String, Error> {
+	Ok(markdown_parser::parse_markdown2html_json_struct(content))
 }
 
 // insert new paper, don't need to insert id , default use uuid_v1;
@@ -119,10 +112,15 @@ pub fn post_new_paper(
 ) -> Result<usize, Error> {
 	let connection = &*get_connection().get().expect("can't get connection");
 	use self::papers::dsl::*;
+	// parse paper content into json structure
+	let paper_content = parse_paper_content(param_content).map_err(|_| Error::ParseError)?;
+	// store base64
+	let base64_content = base64::encode(&paper_content);
+
 	diesel::insert_into(papers)
 		.values((
 			title.eq(param_title),
-			content.eq(param_content),
+			content.eq(base64_content),
 			author.eq(param_author),
 			tags.eq(param_tags),
 		))
@@ -151,7 +149,11 @@ pub fn update_paper(
 	param_tags: &[String],
 ) -> Result<usize, Error> {
 	let connection = &*get_connection().get().expect("can't get connection");
-	let param_content = base64::encode(&param_content);
+
+	// parse paper content into json structure
+	let paper_content = parse_paper_content(param_content).map_err(|_| Error::ParseError)?;
+	// store base64
+	let base64_content = base64::encode(&paper_content);
 	let raw_sql = format!(
 		"update papers set 
 		author = '{}',
@@ -160,7 +162,7 @@ pub fn update_paper(
 		change_records = change_records || now()
 		where title = '{}'",
 		param_author,
-		param_content,
+		base64_content,
 		array_to_sql(param_tags),
 		param_title
 	);
