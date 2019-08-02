@@ -9,7 +9,7 @@ use std::{collections::HashSet, sync::RwLock};
 
 // reader paper info list,each paper limit 5 row most
 const PAGE_AMOUNT: u64 = 5;
-fn read_paper_info_list(path: web::Path<(u64)>) -> HttpResponse {
+fn read_paper_info_list(path: web::Path<u64>) -> HttpResponse {
 	let index = *path - 1;
 	let offset = index * PAGE_AMOUNT;
 	trace!("get paper info list page index {}", index);
@@ -21,7 +21,33 @@ fn read_paper_info_list(path: web::Path<(u64)>) -> HttpResponse {
 			Response::server_error()
 		}
 		Err(Error::NotFound) => Response::not_found(),
-		_ => Response::bad_request(),
+		_ => Response::bad_request(""),
+	}
+}
+
+// get paper info list by tags
+#[derive(Deserialize)]
+struct ParamTags {
+	tags: String,
+}
+fn read_paper_info_list_by_tags(
+	path: web::Path<u64>,
+	query: web::Query<ParamTags>,
+) -> HttpResponse {
+	let index = *path - 1;
+	let offset = index * PAGE_AMOUNT;
+	let ParamTags { tags } = &*query;
+	let tags: Vec<String> = tags.split(',').map(String::from).collect();
+	trace!("read paper infos by tags");
+	let result = models::query_papers_by_tags(tags, PAGE_AMOUNT, offset);
+	match result {
+		Ok(list) => Response::success(list),
+		Err(Error::DataBaseError(reason)) => {
+			error!("read paper info list: {}", reason);
+			Response::server_error()
+		}
+		Err(Error::NotFound) => Response::not_found(),
+		_ => Response::bad_request(""),
 	}
 }
 
@@ -119,7 +145,7 @@ fn post_new_paper(
 				error!("post paper : {}", reason);
 				Response::server_error()
 			}
-			_ => Response::bad_request(),
+			_ => Response::bad_request(""),
 		},
 	}
 }
@@ -148,7 +174,7 @@ fn update_paper(
 				error!("update paper: {}", reason);
 				Response::server_error()
 			}
-			_ => Response::bad_request(),
+			_ => Response::bad_request(""),
 		},
 	}
 }
@@ -179,7 +205,7 @@ fn put_tags(
 				error!("append tags: {}", reason);
 				Response::server_error()
 			}
-			_ => Response::bad_request(),
+			_ => Response::bad_request(""),
 		},
 	}
 }
@@ -198,6 +224,10 @@ pub fn routes<'a>() -> Vec<(&'a str, Route)> {
 			get().to(read_paper_content),
 		),
 		("/get/paper/infos/{page}", get().to(read_paper_info_list)),
+		(
+			"/get/paper/tags/{page}",
+			get().to(read_paper_info_list_by_tags),
+		),
 		("/post/paper/", post().to(post_new_paper)),
 		("/update/paper/", put().to(update_paper)),
 		("/put/tags/", put().to(put_tags)),

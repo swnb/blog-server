@@ -65,6 +65,24 @@ pub fn query_papers(page_amount: u64, offset: u64) -> Result<Vec<PaperInfo>, Err
 		.map_err(Error::from)
 }
 
+// query paper infos by paper tags
+pub fn query_papers_by_tags(
+	param_tags: Vec<String>,
+	page_amount: u64,
+	offset: u64,
+) -> Result<Vec<PaperInfo>, Error> {
+	let connection = &*get_connection().get().expect("can't get connection");
+	use self::papers::dsl::*;
+
+	papers
+		.select((id, title, author, create_at, tags, is_draft, is_del))
+		.filter(tags.contains(param_tags))
+		.limit(page_amount as i64)
+		.offset(offset as i64)
+		.load::<PaperInfo>(connection)
+		.map_err(Error::from)
+}
+
 // query paper content use paper id and parse content into json struct;
 #[derive(Queryable, Deserialize, Serialize, Insertable)]
 #[table_name = "papers"]

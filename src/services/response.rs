@@ -39,11 +39,11 @@ where
 }
 
 impl<'a> Response<'a, &'a str> {
-	pub fn bad_request() -> HttpResponse {
+	pub fn bad_request(detail:&str) -> HttpResponse {
 		HttpResponse::BadRequest().json(Response {
 			code: Code::WrongArgument,
 			data: "",
-			detail: "wrong input or request",
+			detail,
 		})
 	}
 
