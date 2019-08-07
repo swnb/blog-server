@@ -48,6 +48,7 @@ pub struct PaperInfo {
 	title: String,
 	author: String,
 	create_at: chrono::NaiveDateTime,
+	change_records: Vec<chrono::NaiveDateTime>,
 	tags: Vec<String>,
 	is_draft: bool,
 	is_del: bool,
@@ -58,7 +59,16 @@ pub fn query_papers(page_amount: u64, offset: u64) -> Result<Vec<PaperInfo>, Err
 	use self::papers::dsl::*;
 
 	papers
-		.select((id, title, author, create_at, tags, is_draft, is_del))
+		.select((
+			id,
+			title,
+			author,
+			create_at,
+			change_records,
+			tags,
+			is_draft,
+			is_del,
+		))
 		.limit(page_amount as i64)
 		.offset(offset as i64)
 		.load::<PaperInfo>(connection)
@@ -75,7 +85,16 @@ pub fn query_papers_by_tags(
 	use self::papers::dsl::*;
 
 	papers
-		.select((id, title, author, create_at, tags, is_draft, is_del))
+		.select((
+			id,
+			title,
+			author,
+			create_at,
+			change_records,
+			tags,
+			is_draft,
+			is_del,
+		))
 		.filter(tags.contains(param_tags))
 		.limit(page_amount as i64)
 		.offset(offset as i64)
