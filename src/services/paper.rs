@@ -4,16 +4,25 @@ use log::{error, trace};
 
 use actix_web::{cookie::Cookie, web, HttpMessage, HttpRequest, HttpResponse, Route};
 use models::error::Error;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, sync::RwLock};
 
+#[derive(Serialize)]
+struct PaperInfoListWrap {
+	paper_info_list: Vec<models::PaperInfo>,
+	page_size: i64,
+}
 // reader paper info list,each paper limit 5 row most
 const PAGE_AMOUNT: u64 = 5;
 fn read_paper_info_list(path: web::Path<u64>) -> HttpResponse {
 	let index = *path - 1;
 	let offset = index * PAGE_AMOUNT;
 	trace!("get paper info list page index {}", index);
-	let result = models::query_papers(PAGE_AMOUNT, offset);
+	let result =
+		models::query_papers(PAGE_AMOUNT, offset).map(|(page_size, list)| PaperInfoListWrap {
+			paper_info_list: list,
+			page_size,
+		});
 	match result {
 		Ok(list) => Response::success(list),
 		Err(Error::DataBaseError(reason)) => {
@@ -39,7 +48,13 @@ fn read_paper_info_list_by_tags(
 	let ParamTags { tags } = &*query;
 	let tags: Vec<String> = tags.split(',').map(String::from).collect();
 	trace!("read paper infos by tags");
-	let result = models::query_papers_by_tags(tags, PAGE_AMOUNT, offset);
+	let result =
+		models::query_papers_by_tags(tags, PAGE_AMOUNT, offset).map(|(page_size, list)| {
+			PaperInfoListWrap {
+				paper_info_list: list,
+				page_size,
+			}
+		});
 	match result {
 		Ok(list) => Response::success(list),
 		Err(Error::DataBaseError(reason)) => {

@@ -54,11 +54,20 @@ pub struct PaperInfo {
 	is_del: bool,
 }
 // query paper list with page_amount and page index
-pub fn query_papers(page_amount: u64, offset: u64) -> Result<Vec<PaperInfo>, Error> {
+pub fn query_papers(page_amount: u64, offset: u64) -> Result<(i64, Vec<PaperInfo>), Error> {
 	let connection = &*get_connection()?;
 	use self::papers::dsl::*;
 
-	papers
+	let total_size: i64 = papers
+		.select(diesel::dsl::count_star())
+		.first(connection)
+		.map_err(Error::from)?;
+	let mut page_size: i64 = total_size / page_amount as i64;
+	if total_size % page_amount as i64 != 0 {
+		page_size += 1;
+	}
+
+	let paper_infos = papers
 		.select((
 			id,
 			title,
@@ -72,7 +81,8 @@ pub fn query_papers(page_amount: u64, offset: u64) -> Result<Vec<PaperInfo>, Err
 		.limit(page_amount as i64)
 		.offset(offset as i64)
 		.load::<PaperInfo>(connection)
-		.map_err(Error::from)
+		.map_err(Error::from)?;
+	Ok((page_size, paper_infos))
 }
 
 // query paper infos by paper tags
@@ -80,11 +90,20 @@ pub fn query_papers_by_tags(
 	param_tags: Vec<String>,
 	page_amount: u64,
 	offset: u64,
-) -> Result<Vec<PaperInfo>, Error> {
+) -> Result<(i64, Vec<PaperInfo>), Error> {
 	let connection = &*get_connection()?;
 	use self::papers::dsl::*;
 
-	papers
+	let total_size: i64 = papers
+		.select(diesel::dsl::count_star())
+		.first(connection)
+		.map_err(Error::from)?;
+	let mut page_size: i64 = total_size / page_amount as i64;
+	if total_size % page_amount as i64 != 0 {
+		page_size += 1;
+	}
+
+	let paper_infos = papers
 		.select((
 			id,
 			title,
@@ -99,7 +118,8 @@ pub fn query_papers_by_tags(
 		.limit(page_amount as i64)
 		.offset(offset as i64)
 		.load::<PaperInfo>(connection)
-		.map_err(Error::from)
+		.map_err(Error::from)?;
+	Ok((page_size, paper_infos))
 }
 
 // query paper content use paper id and parse content into json struct;
