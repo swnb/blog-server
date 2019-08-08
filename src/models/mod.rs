@@ -96,6 +96,7 @@ pub fn query_papers_by_tags(
 
 	let total_size: i64 = papers
 		.select(diesel::dsl::count_star())
+		.filter(tags.contains(&param_tags))
 		.first(connection)
 		.map_err(Error::from)?;
 	let mut page_size: i64 = total_size / page_amount as i64;
