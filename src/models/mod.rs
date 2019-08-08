@@ -19,7 +19,7 @@ table! {
 		content -> Text,
 		create_at -> Timestamp,
 		change_records -> Array<Timestamp>,
-		tags  -> Array<Varchar>,
+		tags  -> Array<Text>,
 		is_draft -> Bool,
 		is_del -> Bool,
 	}
