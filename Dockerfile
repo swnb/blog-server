@@ -1,10 +1,15 @@
-FROM rust
-
+FROM rust:latest as Builder
 WORKDIR /app/blog/
 COPY . .
-ENV SERVER_PORT 80
-ENV RUST_LOG actix_web=info
-EXPOSE 80
+RUN ls 
 RUN cargo build --release
 
-ENTRYPOINT [ "./target/release/blog" ]
+FROM alpine:latest
+WORKDIR /app
+RUN ls 
+ENV  MODE product
+ENV SERVER 0.0.0.0
+ENV SERVER_PORT 80
+EXPOSE 80
+COPY --from=0 /app/blog/target/release/blog .
+ENTRYPOINT [ "./blog" > "./log" ]
