@@ -1,109 +1,262 @@
 pub mod connect;
-pub mod schema;
-pub mod table;
+pub mod error;
 
 use super::markdown_parser;
 use connect::get_connection;
-use diesel::prelude::*;
-use schema::{paper_tags::dsl as paper_tags_dsl, papers::dsl as papers_dsl};
-use table::{PaperContent, PaperInfo};
+use error::Error;
+use {
+	diesel::prelude::*,
+	serde::{Deserialize, Serialize},
+	uuid::Uuid,
+};
 
-// define error enum
-pub enum Error {
-	Query(String),
-	Database(String),
-}
-
-impl std::fmt::Debug for Error {
-	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::result::Result<(), std::fmt::Error> {
-		match self {
-			Error::Query(message) => write!(f, "err query : {}", message),
-			Error::Database(message) => write!(f, "err database : {}", message),
-		}
+// papers table schema
+table! {
+	papers (id) {
+		id -> Uuid,
+		title -> Varchar,
+		author -> Varchar,
+		content -> Text,
+		create_at -> Timestamp,
+		change_records -> Array<Timestamp>,
+		tags  -> Array<Text>,
+		is_draft -> Bool,
+		is_del -> Bool,
 	}
 }
 
-// query paper infos from database
-pub fn query_paper_infos(page_amount: i64, offset: i64) -> Result<Vec<PaperInfo>, Error> {
-	let connection = &*get_connection().get().expect("can't set connection");
-	use papers_dsl::{author, create_time, hash, last_change_time, papers, title};
-	papers
-		.select((title, author, last_change_time, create_time, hash))
-		.limit(page_amount)
-		.offset(page_amount * offset)
-		.load::<PaperInfo>(connection)
-		.map_err(|_| Error::Database(String::from("database error")))
+// table papers define all column struct
+#[derive(Queryable, Deserialize, Serialize, Insertable)]
+#[table_name = "papers"]
+pub struct Paper {
+	id: Uuid,
+	title: String,
+	content: String,
+	author: String,
+	create_at: chrono::NaiveDateTime,
+	change_records: Vec<chrono::NaiveDateTime>,
+	tags: Vec<String>,
+	is_draft: bool,
+	is_del: bool,
 }
 
-pub fn query_paper_content(paper_hash: &str) -> Result<String, Error> {
-	use papers_dsl::{content, hash, papers};
-	let connection = &*get_connection().get().expect("can't set connection");
-	papers
-		.select((hash, content))
-		.filter(hash.eq(paper_hash))
+// define paper info struct
+#[derive(Queryable, Deserialize, Serialize, Insertable)]
+#[table_name = "papers"]
+pub struct PaperInfo {
+	id: Uuid,
+	title: String,
+	author: String,
+	create_at: chrono::NaiveDateTime,
+	change_records: Vec<chrono::NaiveDateTime>,
+	tags: Vec<String>,
+	is_draft: bool,
+	is_del: bool,
+}
+// query paper list with page_amount and page index
+pub fn query_papers(page_amount: u64, offset: u64) -> Result<(i64, Vec<PaperInfo>), Error> {
+	let connection = &*get_connection()?;
+	use self::papers::dsl::*;
+
+	let total_size: i64 = papers
+		.select(diesel::dsl::count_star())
+		.first(connection)
+		.map_err(Error::from)?;
+	let mut page_size: i64 = total_size / page_amount as i64;
+	if total_size % page_amount as i64 != 0 {
+		page_size += 1;
+	}
+
+	let paper_infos = papers
+		.select((
+			id,
+			title,
+			author,
+			create_at,
+			change_records,
+			tags,
+			is_draft,
+			is_del,
+		))
+		.limit(page_amount as i64)
+		.offset(offset as i64)
+		.load::<PaperInfo>(connection)
+		.map_err(Error::from)?;
+	Ok((page_size, paper_infos))
+}
+
+// query paper infos by paper tags
+pub fn query_papers_by_tags(
+	param_tags: Vec<String>,
+	page_amount: u64,
+	offset: u64,
+) -> Result<(i64, Vec<PaperInfo>), Error> {
+	let connection = &*get_connection()?;
+	use self::papers::dsl::*;
+
+	let total_size: i64 = papers
+		.select(diesel::dsl::count_star())
+		.filter(tags.contains(&param_tags))
+		.first(connection)
+		.map_err(Error::from)?;
+	let mut page_size: i64 = total_size / page_amount as i64;
+	if total_size % page_amount as i64 != 0 {
+		page_size += 1;
+	}
+
+	let paper_infos = papers
+		.select((
+			id,
+			title,
+			author,
+			create_at,
+			change_records,
+			tags,
+			is_draft,
+			is_del,
+		))
+		.filter(tags.contains(param_tags))
+		.limit(page_amount as i64)
+		.offset(offset as i64)
+		.load::<PaperInfo>(connection)
+		.map_err(Error::from)?;
+	Ok((page_size, paper_infos))
+}
+
+// query paper content use paper id and parse content into json struct;
+#[derive(Queryable, Deserialize, Serialize, Insertable)]
+#[table_name = "papers"]
+pub struct PaperContent {
+	id: Uuid,
+	content: String,
+}
+
+pub fn query_paper_content(paper_id: &str) -> Result<String, Error> {
+	let connection = &*get_connection()?;
+	use self::papers::dsl;
+	let paper_id = Uuid::parse_str(paper_id).map_err(|_| Error::ParseError)?;
+	dsl::papers
+		.select((dsl::id, dsl::content))
+		.filter(dsl::id.eq(paper_id))
 		.limit(1)
-		.load::<PaperContent>(connection)
-		.map_err(|_| Error::Database(String::from("database error")))
-		.and_then(|result| {
-			result
-				.get(0)
-				.ok_or(Error::Query(String::from("query result nothing")))
-				.map(|row| markdown_parser::parse_markdown2html_json_struct(&row.content))
+		.first::<PaperContent>(connection)
+		.map_err(Error::from)
+		.and_then(|paper_content| {
+			let PaperContent { ref content, .. } = paper_content;
+			let content = base64::decode(content).map_err(|_| Error::ParseError)?;
+			String::from_utf8(content).map_err(|_| Error::ParseError)
 		})
 }
 
-// insert new paper
-pub fn post_paper(
+// parse paper content
+// first make content html
+// then parse html into json struct
+fn parse_paper_content(content: &str) -> Result<String, Error> {
+	Ok(markdown_parser::parse_markdown2html_json_struct(content))
+}
+
+// insert new paper, don't need to insert id , default use uuid_v1;
+// don't need create time, default use now();
+// don't need record time
+// don't need is_draft default true,
+// don't need is_del default false,
+// post new_paper_api
+// post only one paper
+pub fn post_new_paper(
 	param_title: &str,
-	param_content: &str,
 	param_author: &str,
-	param_create_time: &str,
-	param_tags: &Vec<String>,
-	hash_id: &str,
+	param_content: &str,
+	param_tags: &[String],
 ) -> Result<usize, Error> {
-	let connection = &*get_connection().get().expect("can't set connection");
-	use papers_dsl::{author, content, create_time, hash, papers, title};
+	let connection = &*get_connection()?;
+	use self::papers::dsl::*;
+	// parse paper content into json structure
+	let paper_content = parse_paper_content(param_content).map_err(|_| Error::ParseError)?;
+	// store base64
+	let base64_content = base64::encode(&paper_content);
+
 	diesel::insert_into(papers)
 		.values((
 			title.eq(param_title),
-			content.eq(param_content),
+			content.eq(base64_content),
 			author.eq(param_author),
-			create_time.eq(param_create_time),
-			hash.eq(hash_id),
+			tags.eq(param_tags),
 		))
 		.execute(connection)
-		.unwrap();
-
-	use paper_tags_dsl::{id, paper_tags, tag};
-	param_tags.iter().for_each(|param_tag| {
-		diesel::insert_into(paper_tags)
-			.values((tag.eq(param_tag), id.eq(hash_id)))
-			.execute(connection)
-			.unwrap();
-	});
-	Ok(1)
+		.map_err(Error::from)
 }
 
-// query paper tags
-pub fn get_paper_tags(param_id: &str) -> Result<Vec<String>, Error> {
-	let connection = &*get_connection().get().expect("can't set connection");
-	use paper_tags_dsl::{id, paper_tags, tag};
-
-	paper_tags
-		.select(tag)
-		.filter(id.eq(param_id))
-		.load::<String>(connection)
-		.map_err(|_| Error::Query(String::from("query error")))
+// format array into postgresql
+fn array_to_sql(array: &[String]) -> String {
+	String::from("{")
+		+ &array
+			.iter()
+			.map(|v| format!("\"{}\"", v))
+			.collect::<Vec<String>>()
+			.join(",")
+			.to_string()
+		+ "}"
 }
 
-// get relatad paper by tag
-pub fn get_relatad_paper_by_tag(param_tag: &str) -> Result<Vec<String>, Error> {
-	let connection = &*get_connection().get().expect("can't set connection");
-	use paper_tags_dsl::{id, paper_tags, tag};
+// update paper content without title change
+// update paper with use same title, and update record timestamp
+pub fn update_paper(
+	param_title: &str,
+	param_author: &str,
+	param_content: &str,
+	param_tags: &[String],
+) -> Result<usize, Error> {
+	let connection = &*get_connection()?;
 
-	paper_tags
-		.select(id)
-		.filter(tag.eq(param_tag))
-		.load::<String>(connection)
-		.map_err(|_| Error::Query(String::from("query error")))
+	// parse paper content into json structure
+	let paper_content = parse_paper_content(param_content).map_err(|_| Error::ParseError)?;
+	// store base64
+	let base64_content = base64::encode(&paper_content);
+	let raw_sql = format!(
+		"update papers set 
+		author = '{}',
+		content = '{}',
+		tags = '{}',
+		change_records = change_records || now()
+		where title = '{}'",
+		param_author,
+		base64_content,
+		array_to_sql(param_tags),
+		param_title
+	);
+
+	diesel::sql_query(raw_sql)
+		.execute(connection)
+		.map_err(Error::from)
+}
+
+// insert tags into papers
+// append some tags use same title
+pub fn add_tags(title: &str, tags: &[String]) -> Result<usize, Error> {
+	let connection = &*get_connection()?;
+	let raw_sql = format!(
+		"update papers set tags = tags || '{}' where title = '{}'",
+		array_to_sql(&tags),
+		title
+	);
+	diesel::sql_query(raw_sql)
+		.execute(connection)
+		.map_err(Error::from)
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	#[test]
+	fn test_format_array_sql() {
+		assert_eq!(
+			array_to_sql(
+				&(b'a'..=b'c')
+					.map(char::from)
+					.map(|v| v.to_string())
+					.collect::<Vec<String>>()
+			),
+			"{\"a\",\"b\",\"c\"}"
+		)
+	}
 }
